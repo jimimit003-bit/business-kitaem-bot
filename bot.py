@@ -33,7 +33,11 @@ def build_card_keyboard():
     return kb
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(message.chat.id, "Привет! Я твой первый бот 🤖")
+    bot.send_message(
+    message.chat.id,
+    "🧥 Куртка зимняя\n🟢 Бесплатно\n📍 Москва",
+    reply_markup=build_card_keyboard()
+)
 
 @bot.message_handler(func=lambda message: True)
 def echo(message):
