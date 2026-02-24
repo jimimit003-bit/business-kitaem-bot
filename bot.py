@@ -43,8 +43,7 @@ def start(message):
 def echo(message):
     bot.send_message(message.chat.id, message.text)
 
-print("Bot started...")
-bot.infinity_polling()
+
 @bot.callback_query_handler(func=lambda call: True)
 def handle_buttons(call):
 
@@ -64,3 +63,5 @@ def handle_buttons(call):
 
     elif call.data == "reset":
         bot.answer_callback_query(call.id, "Фильтры сброшены ♻️")
+print("Bot started...")
+bot.infinity_polling()
