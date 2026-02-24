@@ -45,3 +45,22 @@ def echo(message):
 
 print("Bot started...")
 bot.infinity_polling()
+@bot.callback_query_handler(func=lambda call: True)
+def handle_buttons(call):
+
+    if call.data == "next":
+        bot.edit_message_text(
+            "👕 Футболка Nike\n🟡 До 400 ₽\n📍 Москва",
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=build_card_keyboard()
+        )
+
+    elif call.data == "take":
+        bot.answer_callback_query(call.id, "Свяжись с владельцем 😉")
+
+    elif call.data == "fav":
+        bot.answer_callback_query(call.id, "Добавлено в избранное ❤️")
+
+    elif call.data == "reset":
+        bot.answer_callback_query(call.id, "Фильтры сброшены ♻️")
