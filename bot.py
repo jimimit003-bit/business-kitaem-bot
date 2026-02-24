@@ -68,7 +68,21 @@ def handle_buttons(call):
             call.message.message_id,
             reply_markup=build_card_keyboard()
         )
+elif call.data == "f_price":
+    bot.edit_message_text(
+        "💰 Цена — выбери вариант:",
+        call.message.chat.id,
+        call.message.message_id,
+        reply_markup=build_price_menu()
+    )
 
+elif call.data == "back_to_card":
+    bot.edit_message_text(
+        "🧥 Куртка зимняя\n🟢 Бесплатно\n📍 Москва",
+        call.message.chat.id,
+        call.message.message_id,
+        reply_markup=build_card_keyboard()
+    )
     elif call.data == "take":
         bot.answer_callback_query(call.id, "Свяжись с владельцем 😉")
 
