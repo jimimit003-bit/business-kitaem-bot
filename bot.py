@@ -30,6 +30,20 @@ def build_card_keyboard():
         types.InlineKeyboardButton("♻️ Сброс", callback_data="reset")
     )
 
+    return kb# --- Меню цены ---
+def build_price_menu():
+    kb = types.InlineKeyboardMarkup()
+
+    kb.row(
+        types.InlineKeyboardButton("🟢 Бесплатно", callback_data="set_price_free"),
+        types.InlineKeyboardButton("🟡 До 400 ₽", callback_data="set_price_400"),
+    )
+
+    kb.row(
+        types.InlineKeyboardButton("⚪ Любая", callback_data="set_price_any"),
+        types.InlineKeyboardButton("⬅️ Назад", callback_data="back_to_card"),
+    )
+
     return kb
 @bot.message_handler(commands=['start'])
 def start(message):
