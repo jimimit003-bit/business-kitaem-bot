@@ -30,7 +30,8 @@ def build_card_keyboard():
         types.InlineKeyboardButton("♻️ Сброс", callback_data="reset")
     )
 
-    return kb# --- Меню цены ---
+    return kb
+    # --- Меню цены ---
 def build_price_menu():
     kb = types.InlineKeyboardMarkup()
 
