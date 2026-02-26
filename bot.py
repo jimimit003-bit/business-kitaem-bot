@@ -88,7 +88,7 @@ def handle_buttons(call):
         item = ITEMS[user_state[chat_id]]
 
         text = f"🧥 {item['title']}\n"
-        text += f"🟢 Бесплатно\n" if item['price'] == 0 else f"🟡 До {item['price']} ₽\n"
+        text += f"🟢 Бесплатно\n" if item['price'] == 0 else f"💰 {item['price']} ₽\n"
         text += f"📍 {item['city']}"
 
         bot.edit_message_text(
@@ -98,6 +98,8 @@ def handle_buttons(call):
             reply_markup=build_card_keyboard()
         )
 
+    elif call.data == "f_price":
+        ...
     elif call.data == "f_price":
         bot.edit_message_text(
             "💰 Цена — выбери вариант:",
