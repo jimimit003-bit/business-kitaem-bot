@@ -61,7 +61,6 @@ def echo(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_buttons(call):
-
     if call.data == "next":
         bot.edit_message_text(
             "👕 Футболка Nike\n🟡 До 400 ₽\n📍 Москва",
@@ -90,7 +89,7 @@ def handle_buttons(call):
         bot.answer_callback_query(call.id, "✅ Забрано!")
 
     elif call.data == "fav":
-        bot.answer_callback_query(call.id, "❤️ Добавлено в избранное!")
+        bot.answer_callback_query(call.id, "❤️ Добавлено в избранное")
 
     elif call.data == "reset":
         bot.answer_callback_query(call.id, "♻️ Сброшено")
