@@ -57,11 +57,19 @@ def build_price_menu():
     return kb
 @bot.message_handler(commands=['start'])
 def start(message):
+    user_state[message.chat.id] = 0
+
+    item = ITEMS[0]
+
+    text = f"🧥 {item['title']}\n"
+    text += f"🟢 Бесплатно\n" if item['price'] == 0 else f"🟡 До {item['price']} ₽\n"
+    text += f"📍 {item['city']}"
+
     bot.send_message(
-    message.chat.id,
-    "🧥 Куртка зимняя\n🟢 Бесплатно\n📍 Москва",
-    reply_markup=build_card_keyboard()
-)
+        message.chat.id,
+        text,
+        reply_markup=build_card_keyboard()
+    )
 
 @bot.message_handler(func=lambda message: True)
 def echo(message):
