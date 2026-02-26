@@ -81,9 +81,9 @@ def handle_buttons(call):
     if call.data == "next":
         chat_id = call.message.chat.id
 
-user_state[chat_id] = user_state.get(chat_id, 0) + 1
-if user_state[chat_id] >= len(ITEMS):
-    user_state[chat_id] = 0
+        user_state[chat_id] = user_state.get(chat_id, 0) + 1
+        if user_state[chat_id] >= len(ITEMS):
+            user_state[chat_id] = 0
 
         item = ITEMS[user_state[chat_id]]
 
