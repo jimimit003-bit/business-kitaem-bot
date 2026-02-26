@@ -79,12 +79,24 @@ def echo(message):
 @bot.callback_query_handler(func=lambda call: True)
 def handle_buttons(call):
     if call.data == "next":
-        bot.edit_message_text(
-            "👕 Футболка Nike\n🟡 До 400 ₽\n📍 Москва",
-            call.message.chat.id,
-            call.message.message_id,
-            reply_markup=build_card_keyboard()
-        )
+    chat_id = call.message.chat.id
+
+    user_state[chat_id] += 1
+    if user_state[chat_id] >= len(ITEMS):
+        user_state[chat_id] = 0
+
+    item = ITEMS[user_state[chat_id]]
+
+    text = f"🧥 {item['title']}\n"
+    text += f"🟢 Бесплатно\n" if item['price'] == 0 else f"🟡 До {item['price']} ₽\n"
+    text += f"📍 {item['city']}"
+
+    bot.edit_message_text(
+        text,
+        chat_id,
+        call.message.message_id,
+        reply_markup=build_card_keyboard()
+    )
 
     elif call.data == "f_price":
         bot.edit_message_text(
