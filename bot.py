@@ -99,7 +99,6 @@ def handle_buttons(call):
 
 
 
-    elif call.data == "reset":
-        bot.answer_callback_query(call.id, "Фильтры сброшены ♻️")
+    
 print("Bot started...")
 bot.infinity_polling()
