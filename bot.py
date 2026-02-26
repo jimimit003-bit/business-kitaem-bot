@@ -4,7 +4,16 @@ TOKEN = "8516444407:AAGseUj72idFT6b86hbg1W8qI48BIT_kd4Q"
 
 bot = telebot.TeleBot(TOKEN)
 from telebot import types
+# ----- Данные карточек -----
+ITEMS = [
+    {"title": "Куртка зимняя", "price": 0, "city": "Москва"},
+    {"title": "Футболка Nike", "price": 400, "city": "Москва"},
+    {"title": "Кроссовки", "price": 1200, "city": "Москва"},
+    {"title": "Шапка", "price": 200, "city": "Москва"},
+]
 
+# ----- Состояние пользователя -----
+user_state = {}
 # --- Кнопки карточки (PRO режим) ---
 def build_card_keyboard():
     kb = types.InlineKeyboardMarkup()
