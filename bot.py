@@ -78,17 +78,19 @@ def echo(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_buttons(call):
+    chat_id = call.message.chat.id
+
+    # текущий индекс (если не был задан — 0)
+    idx = user_state.get(chat_id, 0)
+
     if call.data == "next":
-        chat_id = call.message.chat.id
+        idx = (idx + 1) % len(ITEMS)
+        user_state[chat_id] = idx
 
-        user_state[chat_id] = user_state.get(chat_id, 0) + 1
-        if user_state[chat_id] >= len(ITEMS):
-            user_state[chat_id] = 0
-
-        item = ITEMS[user_state[chat_id]]
+        item = ITEMS[idx]
 
         text = f"🧥 {item['title']}\n"
-        text += f"🟢 Бесплатно\n" if item['price'] == 0 else f"💰 {item['price']} ₽\n"
+        text += f"🟢 Бесплатно\n" if item.get("price", 0) == 0 else f"🟡 До {item['price']} ₽\n"
         text += f"📍 {item['city']}"
 
         bot.edit_message_text(
@@ -97,36 +99,35 @@ def handle_buttons(call):
             call.message.message_id,
             reply_markup=build_card_keyboard()
         )
+        bot.answer_callback_query(call.id)
 
-    elif call.data == "f_price":
-        ...
     elif call.data == "f_price":
         bot.edit_message_text(
             "💰 Цена — выбери вариант:",
-            call.message.chat.id,
+            chat_id,
             call.message.message_id,
             reply_markup=build_price_menu()
         )
+        bot.answer_callback_query(call.id)
 
     elif call.data == "back_to_card":
+        # возвращаем текущую карточку (по idx)
+        item = ITEMS[user_state.get(chat_id, 0)]
+
+        text = f"🧥 {item['title']}\n"
+        text += f"🟢 Бесплатно\n" if item.get("price", 0) == 0 else f"🟡 До {item['price']} ₽\n"
+        text += f"📍 {item['city']}"
+
         bot.edit_message_text(
-            "🧥 Куртка зимняя\n🟢 Бесплатно\n📍 Москва",
-            call.message.chat.id,
+            text,
+            chat_id,
             call.message.message_id,
             reply_markup=build_card_keyboard()
         )
-
-    elif call.data == "take":
-        bot.answer_callback_query(call.id, "✅ Забрано!")
-
-    elif call.data == "fav":
-        bot.answer_callback_query(call.id, "❤️ Добавлено в избранное")
-
-    elif call.data == "reset":
-        bot.answer_callback_query(call.id, "♻️ Сброшено")
+        bot.answer_callback_query(call.id)
 
     else:
-        bot.answer_callback_query(call.id, "Неизвестная кнопка")
+        bot.answer_callback_query(call.id)
 
 
 
