@@ -75,13 +75,7 @@ conn.commit()
 bot = telebot.TeleBot(TOKEN)
 from telebot import types
 # ----- Данные карточек -----
-ITEMS = [
-    {"title": "Куртка зимняя", "price": 0, "city": "Москва"},
-    {"title": "Футболка Nike", "price": 400, "city": "Москва"},
-    {"title": "Кроссовки", "price": 1200, "city": "Москва"},
-    {"title": "Шапка", "price": 200, "city": "Москва"},
-]
-# ===== DB HELPERS =====
+ITEMS = []  # теперь объявления хранятся только в базе данных
 
 def get_user_id(telegram_id: int) -> int:
     cursor.execute("INSERT OR IGNORE INTO users(telegram_id) VALUES(?)", (telegram_id,))
