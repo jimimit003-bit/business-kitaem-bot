@@ -179,7 +179,38 @@ def start(message):
         text,
         reply_markup=build_card_keyboard()
     )
+@bot.message_handler(commands=['add'])
+def add_command(message):
+    text = message.text.replace('/add', '', 1).strip()
+    parts = [p.strip() for p in text.split(';')]
 
+    if len(parts) < 1 or parts[0] == '':
+        bot.send_message(
+            message.chat.id,
+            "❌ Формат:\n/add Название; цена; город\n\n"
+            "Пример:\n/add Куртка; 0; Москва"
+        )
+        return
+
+    title = parts[0]
+    price = 0
+    city = ""
+
+    if len(parts) >= 2:
+        try:
+            price = int(parts[1])
+        except:
+            price = 0
+
+    if len(parts) >= 3:
+        city = parts[2]
+
+    add_item(title, price, city)
+
+    bot.send_message(
+        message.chat.id,
+        f"✅ Добавлено:\n{title}\n💰 {price}\n📍 {city}"
+    )
 @bot.message_handler(func=lambda message: True)
 def echo(message):
     bot.send_message(message.chat.id, message.text)
