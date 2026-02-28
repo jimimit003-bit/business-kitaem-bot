@@ -93,7 +93,7 @@ def handle_buttons(call):
         item = ITEMS[idx]
 
         text = f"🧥 {item['title']}\n"
-        text += f"🟢 Бесплатно\n" if item.get("price", 0) == 0 else f"🟡 До {item['price']} ₽\n"
+        text += f"🟢 Бесплатно\n" if item['price'] == 0 else f"🟡 {item['price']}₽\n"
         text += f"📍 {item['city']}"
 
         bot.edit_message_text(
@@ -102,7 +102,23 @@ def handle_buttons(call):
             call.message.message_id,
             reply_markup=build_card_keyboard()
         )
-        bot.answer_callback_query(call.id)
+        bot.answer_callback_query(call.id, "Следующая ✅")
+
+    elif call.data == "take":
+        bot.answer_callback_query(call.id, "Забрал ✅")
+
+    elif call.data == "fav":
+        bot.answer_callback_query(call.id, "Добавил в ❤️")
+
+    elif call.data == "reset":
+        user_state[chat_id] = 0
+        bot.answer_callback_query(call.id, "Сбросил 🔄")
+
+    elif call.data == "near":
+        bot.answer_callback_query(call.id, "Ищу рядом 📍")
+
+    elif call.data == "map":
+        bot.answer_callback_query(call.id, "Открываю карту 📍")
 
     elif call.data == "f_price":
         bot.edit_message_text(
@@ -114,11 +130,12 @@ def handle_buttons(call):
         bot.answer_callback_query(call.id)
 
     elif call.data == "back_to_card":
-        # возвращаем текущую карточку (по idx)
-        item = ITEMS[user_state.get(chat_id, 0)]
+        # возвращаем текущую карточку
+        idx = user_state.get(chat_id, 0)
+        item = ITEMS[idx]
 
         text = f"🧥 {item['title']}\n"
-        text += f"🟢 Бесплатно\n" if item.get("price", 0) == 0 else f"🟡 До {item['price']} ₽\n"
+        text += f"🟢 Бесплатно\n" if item['price'] == 0 else f"🟡 {item['price']}₽\n"
         text += f"📍 {item['city']}"
 
         bot.edit_message_text(
@@ -130,7 +147,7 @@ def handle_buttons(call):
         bot.answer_callback_query(call.id)
 
     else:
-        bot.answer_callback_query(call.id)
+        bot.answer_callback_query(call.id, "Неизвестная кнопка")
 
 
 
