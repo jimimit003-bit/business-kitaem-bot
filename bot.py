@@ -47,7 +47,24 @@ def remove_favorite(user_id: int, item_id: int):
         (user_id, item_id)
     )
     conn.commit()
+def add_item(title: str, price: int, city: str):
+    cursor.execute(
+        "INSERT INTO items(title, price, city) VALUES (?, ?, ?)",
+        (title, price, city)
+    )
+    conn.commit()
 
+
+def get_items():
+    cursor.execute("SELECT id, title, price, city FROM items ORDER BY id DESC")
+    return cursor.fetchall()
+
+
+def get_item_by_index(idx: int):
+    items = get_items()
+    if not items:
+        return None
+    return items[idx % len(items)]
 def get_favorites(user_id: int):
     cursor.execute(
         "SELECT item_id FROM favorites WHERE user_id = ?",
