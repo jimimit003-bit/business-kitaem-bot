@@ -4,7 +4,38 @@ import sqlite3
 print("=== BOT STARTING ===", flush=True)
 sys.stdout.flush()
 TOKEN = "8516444407:AAGseUj72idFT6b86hbg1W8qI48BIT_kd4Q"
+# === DATABASE ===
+conn = sqlite3.connect("darom.db", check_same_thread=False)
+cursor = conn.cursor()
 
+# Таблица пользователей
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    telegram_id INTEGER UNIQUE
+)
+""")
+
+# Таблица объявлений
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT,
+    price INTEGER,
+    city TEXT
+)
+""")
+
+# Таблица избранного
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS favorites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    item_id INTEGER
+)
+""")
+
+conn.commit()
 bot = telebot.TeleBot(TOKEN)
 from telebot import types
 # ----- Данные карточек -----
