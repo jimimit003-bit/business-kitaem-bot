@@ -45,7 +45,46 @@ ITEMS = [
     {"title": "Кроссовки", "price": 1200, "city": "Москва"},
     {"title": "Шапка", "price": 200, "city": "Москва"},
 ]
+# ===== DB HELPERS =====
 
+def get_user_id(telegram_id: int) -> int:
+    cursor.execute("INSERT OR IGNORE INTO users(telegram_id) VALUES(?)", (telegram_id,))
+    conn.commit()
+    cursor.execute("SELECT id FROM users WHERE telegram_id=?", (telegram_id,))
+    return cursor.fetchone()[0]
+
+def ensure_items_loaded():
+    # если таблица items пустая — загрузим туда ITEMS
+    cursor.execute("SELECT COUNT(*) FROM items")
+    count = cursor.fetchone()[0]
+    if count == 0:
+        for it in ITEMS:
+            cursor.execute(
+                "INSERT INTO items(title, price, city) VALUES(?,?,?)",
+                (it.get("title", ""), int(it.get("price", 0)), it.get("city", ""))
+            )
+        conn.commit()
+
+def get_item_db_id(idx: int) -> int:
+    # предполагаем, что items загружены в том же порядке, что ITEMS
+    cursor.execute("SELECT id FROM items LIMIT 1 OFFSET ?", (idx,))
+    row = cursor.fetchone()
+    return row[0] if row else None
+
+def add_favorite(user_id: int, item_id: int):
+    cursor.execute(
+        "INSERT INTO favorites(user_id, item_id) VALUES(?,?)",
+        (user_id, item_id)
+    )
+    conn.commit()
+
+def clear_favorites(user_id: int):
+    cursor.execute("DELETE FROM favorites WHERE user_id=?", (user_id,))
+    conn.commit()
+
+
+# загрузим items один раз при старте
+ensure_items_loaded()
 # ----- Состояние пользователя -----
 user_state = {}
 # --- Кнопки карточки (PRO режим) ---
