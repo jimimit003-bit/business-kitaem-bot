@@ -150,19 +150,20 @@ def build_price_menu():
     return kb
 @bot.message_handler(commands=['start'])
 def start(message):
-    user_state[message.chat.id] = 0
+    chat_id = message.chat.id
+    user_state[chat_id] = 0
 
-    item = ITEMS[0]
+    item = get_item_by_index(0)  # берем первое объявление из БД
+    if not item:
+        bot.send_message(chat_id, "Пока нет объявлений 😕\nДобавь первое командой:\n/add Куртка;0;Москва")
+        return
 
-    text = f"🧥 {item['title']}\n"
-    text += f"🟢 Бесплатно\n" if item['price'] == 0 else f"🟡 До {item['price']} ₽\n"
-    text += f"📍 {item['city']}"
+    # item = (id, title, price, city)
+    text = f"🧥 {item[1]}\n"
+    text += ("🟢 Бесплатно\n" if item[2] == 0 else f"🟡 {item[2]}\n")
+    text += f"📍 {item[3]}"
 
-    bot.send_message(
-        message.chat.id,
-        text,
-        reply_markup=build_card_keyboard()
-    )
+    bot.send_message(chat_id, text, reply_markup=build_card_keyboard())
 @bot.message_handler(commands=['add'])
 def add_command(message):
     text = message.text.replace('/add', '', 1).strip()
