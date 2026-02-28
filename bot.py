@@ -83,17 +83,7 @@ def get_user_id(telegram_id: int) -> int:
     cursor.execute("SELECT id FROM users WHERE telegram_id=?", (telegram_id,))
     return cursor.fetchone()[0]
 
-def ensure_items_loaded():
-    # если таблица items пустая — загрузим туда ITEMS
-    cursor.execute("SELECT COUNT(*) FROM items")
-    count = cursor.fetchone()[0]
-    if count == 0:
-        for it in ITEMS:
-            cursor.execute(
-                "INSERT INTO items(title, price, city) VALUES(?,?,?)",
-                (it.get("title", ""), int(it.get("price", 0)), it.get("city", ""))
-            )
-        conn.commit()
+
 
 def get_item_db_id(idx: int) -> int:
     # предполагаем, что items загружены в том же порядке, что ITEMS
