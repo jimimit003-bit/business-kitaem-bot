@@ -34,7 +34,26 @@ CREATE TABLE IF NOT EXISTS favorites (
     item_id INTEGER
 )
 """)
+def add_favorite(user_id: int, item_id: int):
+    cursor.execute(
+        "INSERT INTO favorites (user_id, item_id) VALUES (?, ?)",
+        (user_id, item_id)
+    )
+    conn.commit()
 
+def remove_favorite(user_id: int, item_id: int):
+    cursor.execute(
+        "DELETE FROM favorites WHERE user_id = ? AND item_id = ?",
+        (user_id, item_id)
+    )
+    conn.commit()
+
+def get_favorites(user_id: int):
+    cursor.execute(
+        "SELECT item_id FROM favorites WHERE user_id = ?",
+        (user_id,)
+    )
+    return [row[0] for row in cursor.fetchall()]
 conn.commit()
 bot = telebot.TeleBot(TOKEN)
 from telebot import types
