@@ -230,9 +230,9 @@ def handle_buttons(call):
         bot.answer_callback_query(call.id, "Забрал ✅")
 
     elif call.data == "fav":
-    idx = user_state.get(chat_id, 0)
-    add_favorite(chat_id, idx)
-    bot.answer_callback_query(call.id, "Добавил в ❤️")
+        idx = user_state.get(chat_id, 0)
+        add_favorite(chat_id, idx)
+        bot.answer_callback_query(call.id, "Добавил в ❤️")
 
     elif call.data == "reset":
         user_state[chat_id] = 0
