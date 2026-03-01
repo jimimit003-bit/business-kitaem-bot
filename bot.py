@@ -191,7 +191,7 @@ def add_command(message):
 
     if len(parts) >= 3:
         city = parts[2]
-if len(title) < 3:
+    if len(title) < 3:
     bot.send_message(message.chat.id, "❌ Название слишком короткое")
     return
     add_item(title, price, city)
