@@ -69,10 +69,10 @@ def remove_favorite(user_id: int, item_id: int):
         (user_id, item_id)
     )
     conn.commit()
-def add_item(title: str, price: int, city: str):
+def add_item(title: str, price: int, city: str, kind: str = "regular"):
     cursor.execute(
-        "INSERT INTO items(title, price, city) VALUES (?, ?, ?)",
-        (title, price, city)
+        "INSERT INTO items(title, price, city, kind) VALUES (?, ?, ?, ?)",
+        (title, price, city, kind)
     )
     conn.commit()
 
