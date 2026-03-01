@@ -7,6 +7,16 @@ TOKEN = "8516444407:AAGseUj72idFT6b86hbg1W8qI48BIT_kd4Q"
 bot = telebot.TeleBot(TOKEN)
 from telebot import types
 ITEMS = []
+# === CREATE FLOW STATES ===
+ST_NONE = 0
+ST_ADD_KIND = 10
+ST_ADD_TITLE = 11
+ST_ADD_PRICE = 12
+ST_ADD_CITY = 13
+ST_ADD_CONFIRM = 14
+
+user_state = {}     # chat_id -> state
+user_draft = {}     # chat_id -> dict(kind,title,price,city)
 # === DATABASE ===
 conn = sqlite3.connect("darom.db", check_same_thread=False)
 cursor = conn.cursor()
