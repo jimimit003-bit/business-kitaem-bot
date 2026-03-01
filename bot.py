@@ -350,7 +350,23 @@ def handle_buttons(call):
 
     else:
         bot.answer_callback_query(call.id, "Неизвестная кнопка")
+def kb_cancel():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add(types.KeyboardButton("❌ Отмена"))
+    return kb
 
+def kb_choose_kind():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.row(types.KeyboardButton("🟢 Бесплатно"), types.KeyboardButton("🟡 До 400 ₽"))
+    kb.row(types.KeyboardButton("⚪️ Обычное"), types.KeyboardButton("❌ Отмена"))
+    return kb
+
+@bot.message_handler(func=lambda m: m.text == "➕ Добавить объявление")
+def start_add_flow(message):
+    chat_id = message.chat.id
+    user_state[chat_id] = ST_ADD_KIND
+    user_draft[chat_id] = {}
+    bot.send_message(chat_id, "Выбери тип объявления:", reply_markup=kb_choose_kind())
 
 
     
