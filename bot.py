@@ -131,7 +131,9 @@ def build_card_keyboard():
         types.InlineKeyboardButton("📍 Рядом со мной", callback_data="near"),
         types.InlineKeyboardButton("♻️ Сброс", callback_data="reset")
     )
-
+kb.row(
+    types.InlineKeyboardButton("➕ Добавить объявление", callback_data="add_item")
+)
     return kb
     # --- Меню цены ---
 def build_price_menu():
