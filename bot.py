@@ -34,6 +34,23 @@ CREATE TABLE IF NOT EXISTS favorites (
     item_id INTEGER
 )
 """)
+# --- Антиспам/баны ---
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS bans (
+  user_id INTEGER PRIMARY KEY,
+  reason TEXT,
+  created_at INTEGER
+)
+""")
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS spam_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER,
+  created_at INTEGER
+)
+""")
+conn.commit()
 def add_favorite(user_id: int, item_id: int):
     cursor.execute(
         "INSERT INTO favorites (user_id, item_id) VALUES (?, ?)",
