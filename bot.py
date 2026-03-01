@@ -104,7 +104,7 @@ def clear_favorites(user_id: int):
 
 
 # загрузим items один раз при старте
-ensure_items_loaded()
+
 # ----- Состояние пользователя -----
 user_state = {}
 # --- Кнопки карточки (PRO режим) ---
