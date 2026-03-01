@@ -4,6 +4,9 @@ import sqlite3
 print("=== BOT STARTING ===", flush=True)
 sys.stdout.flush()
 TOKEN = "8516444407:AAGseUj72idFT6b86hbg1W8qI48BIT_kd4Q"
+bot = telebot.TeleBot(TOKEN)
+from telebot import types
+ITEMS = []
 # === DATABASE ===
 conn = sqlite3.connect("darom.db", check_same_thread=False)
 cursor = conn.cursor()
@@ -135,10 +138,7 @@ def get_favorites(user_id: int):
     cursor.execute("SELECT item_id FROM favorites WHERE user_id = ?", (user_id,))
     return [row[0] for row in cursor.fetchall()]
 
-bot = telebot.TeleBot(TOKEN)
-from telebot import types
-# ----- Данные карточек -----
-ITEMS = []  # теперь объявления хранятся только в базе данных
+
 
 def get_user_id(telegram_id: int) -> int:
     cursor.execute("INSERT OR IGNORE INTO users(telegram_id) VALUES(?)", (telegram_id,))
