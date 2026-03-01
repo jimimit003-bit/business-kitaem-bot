@@ -25,7 +25,12 @@ CREATE TABLE IF NOT EXISTS items (
     city TEXT
 )
 """)
-
+# добавляем колонку kind если её нет
+try:
+    cursor.execute("ALTER TABLE items ADD COLUMN kind TEXT DEFAULT 'regular'")
+    conn.commit()
+except:
+    pass
 # Таблица избранного
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS favorites (
