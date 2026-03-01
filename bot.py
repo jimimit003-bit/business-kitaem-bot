@@ -70,7 +70,7 @@ def get_item_by_index(idx: int):
 def get_favorites(user_id: int):
     cursor.execute("SELECT item_id FROM favorites WHERE user_id = ?", (user_id,))
     return [row[0] for row in cursor.fetchall()]
-conn.commit()
+
 bot = telebot.TeleBot(TOKEN)
 from telebot import types
 # ----- Данные карточек -----
