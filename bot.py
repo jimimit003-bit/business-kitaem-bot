@@ -103,7 +103,7 @@ def clear_favorites(user_id: int):
     conn.commit()
 
 
-# загрузим items один раз при старте
+
 
 # ----- Состояние пользователя -----
 user_state = {}
