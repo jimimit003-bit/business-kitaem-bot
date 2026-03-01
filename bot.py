@@ -75,7 +75,49 @@ def add_item(title: str, price: int, city: str, kind: str = "regular"):
         (title, price, city, kind)
     )
     conn.commit()
+@bot.message_handler(commands=['addfree'])
+def addfree_command(message):
+    # формат: /addfree Название;Город
+    text = message.text.replace('/addfree', '', 1).strip()
+    parts = [p.strip() for p in text.split(';')]
 
+    if len(parts) < 2 or parts[0] == '' or parts[1] == '':
+        bot.send_message(message.chat.id, "❌ Формат:\n/addfree Название;Город\nПример:\n/addfree Куртка;Москва")
+        return
+
+    title = parts[0]
+    city = parts[1]
+    price = 0
+
+    add_item(title, price, city, kind="free")
+    bot.send_message(message.chat.id, f"✅ Добавлено (Бесплатно):\n{title}\n🟢 Бесплатно\n📍 {city}")
+
+
+@bot.message_handler(commands=['add400'])
+def add400_command(message):
+    # формат: /add400 Название;Цена;Город
+    text = message.text.replace('/add400', '', 1).strip()
+    parts = [p.strip() for p in text.split(';')]
+
+    if len(parts) < 3 or parts[0] == '' or parts[1] == '' or parts[2] == '':
+        bot.send_message(message.chat.id, "❌ Формат:\n/add400 Название;Цена;Город\nПример:\n/add400 Кроссовки;350;Москва")
+        return
+
+    title = parts[0]
+    city = parts[2]
+
+    try:
+        price = int(parts[1])
+    except:
+        bot.send_message(message.chat.id, "❌ Цена должна быть числом.")
+        return
+
+    if price < 1 or price > 400:
+        bot.send_message(message.chat.id, "❌ Для /add400 цена должна быть от 1 до 400 ₽.")
+        return
+
+    add_item(title, price, city, kind="under400")
+    bot.send_message(message.chat.id, f"✅ Добавлено (До 400₽):\n{title}\n🟡 {price} ₽\n📍 {city}")
 
 def get_items():
     cursor.execute("SELECT id, title, price, city FROM items ORDER BY id DESC")
