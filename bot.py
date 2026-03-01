@@ -107,7 +107,8 @@ def clear_favorites(user_id: int):
 
 # ----- Состояние пользователя -----
 user_state = {}
-add_state = {}   # хранит шаг добавления объявления# --- Кнопки карточки (PRO режим) ---
+add_state = {}   # хранит шаг добавления объявления
+# --- Кнопки карточки (PRO режим) ---
 def build_card_keyboard():
     kb = types.InlineKeyboardMarkup()
 
