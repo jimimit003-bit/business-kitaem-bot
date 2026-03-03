@@ -352,11 +352,13 @@ elif call.data == "add_item":
     user_draft[chat_id] = {}
     bot.send_message(chat_id, "Выберите тип объявления:", reply_markup=kb_choose_kind())
     bot.answer_callback_query(call.id)
-elif call.data == "set_price_free":
-elif call.data == "set_price_400":
-elif call.data == "set_price_any":
-    else:
-        bot.answer_callback_query(call.id, "Неизвестная кнопка")
+
+elif call.data in ("set_price_free", "set_price_400", "set_price_any"):
+    # если фильтр цены пока не делаем — хотя бы не падаем
+    bot.answer_callback_query(call.id)
+
+else:
+    bot.answer_callback_query(call.id)
 def kb_cancel():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     kb.add(types.KeyboardButton("❌ Отмена"))
