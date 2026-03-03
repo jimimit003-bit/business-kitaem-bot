@@ -359,6 +359,7 @@ elif call.data in ("set_price_free", "set_price_400", "set_price_any"):
 
 else:
     bot.answer_callback_query(call.id)
+    
 def kb_cancel():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     kb.add(types.KeyboardButton("❌ Отмена"))
