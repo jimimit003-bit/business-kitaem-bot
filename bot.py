@@ -352,6 +352,9 @@ elif call.data == "add_item":
     user_draft[chat_id] = {}
     bot.send_message(chat_id, "Выберите тип объявления:", reply_markup=kb_choose_kind())
     bot.answer_callback_query(call.id)
+elif call.data == "set_price_free":
+elif call.data == "set_price_400":
+elif call.data == "set_price_any":
     else:
         bot.answer_callback_query(call.id, "Неизвестная кнопка")
 def kb_cancel():
