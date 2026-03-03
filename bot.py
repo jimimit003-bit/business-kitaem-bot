@@ -377,23 +377,8 @@ def cancel_flow(message):
     user_state[chat_id] = ST_NONE
     user_draft.pop(chat_id, None)
     bot.send_message(chat_id, "Ок, отменено.", reply_markup=types.ReplyKeyboardRemove())
-elif call.data == "set_price_free":
-    user_draft[chat_id] = {"kind": "free"}
-    user_state[chat_id] = "wait_title"
-    bot.send_message(chat_id, "Введите название (цена будет 0 ₽):")
-    bot.answer_callback_query(call.id)
 
-elif call.data == "set_price_400":
-    user_draft[chat_id] = {"kind": "400"}
-    user_state[chat_id] = "wait_title"
-    bot.send_message(chat_id, "Введите название объявления:")
-    bot.answer_callback_query(call.id)
 
-elif call.data == "set_price_any":
-    user_draft[chat_id] = {"kind": "any"}
-    user_state[chat_id] = "wait_title"
-    bot.send_message(chat_id, "Введите название объявления:")
-    bot.answer_callback_query(call.id)
     
 print("Bot started...")
 bot.infinity_polling()
