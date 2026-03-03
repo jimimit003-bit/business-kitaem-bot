@@ -347,7 +347,11 @@ def handle_buttons(call):
             reply_markup=build_card_keyboard()
         )
         bot.answer_callback_query(call.id)
-
+elif call.data == "add_item":
+    user_state[chat_id] = ST_ADD_KIND
+    user_draft[chat_id] = {}
+    bot.send_message(chat_id, "Выберите тип объявления:", reply_markup=kb_choose_kind())
+    bot.answer_callback_query(call.id)
     else:
         bot.answer_callback_query(call.id, "Неизвестная кнопка")
 def kb_cancel():
