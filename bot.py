@@ -135,7 +135,9 @@ def add400_command(message):
 def get_items():
     cursor.execute("SELECT id, title, price, city FROM items ORDER BY id DESC")
     return cursor.fetchall()
-
+def refresh_items():
+    global ITEMS
+    ITEMS = get_items()
 
 def get_item_by_index(idx: int):
     items = get_items()
