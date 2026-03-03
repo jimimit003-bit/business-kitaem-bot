@@ -367,7 +367,12 @@ def start_add_flow(message):
     user_state[chat_id] = ST_ADD_KIND
     user_draft[chat_id] = {}
     bot.send_message(chat_id, "Выбери тип объявления:", reply_markup=kb_choose_kind())
-
+@bot.message_handler(func=lambda m: m.text == "❌ Отмена")
+def cancel_flow(message):
+    chat_id = message.chat.id
+    user_state[chat_id] = ST_NONE
+    user_draft.pop(chat_id, None)
+    bot.send_message(chat_id, "Ок, отменено.", reply_markup=types.ReplyKeyboardRemove())
 
     
 print("Bot started...")
