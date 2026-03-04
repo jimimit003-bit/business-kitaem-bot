@@ -136,8 +136,9 @@ def add400_command(message):
     bot.send_message(message.chat.id, f"✅ Добавлено (До 400₽):\n{title}\n🟡 {price} ₽\n📍 {city}")
 
 def get_items():
-    cursor.execute("SELECT id, title, price, city FROM items ORDER BY id DESC")
+    cursor.execute("SELECT id, title, price, city, kind FROM items ORDER BY id DESC")
     return cursor.fetchall()
+
 def refresh_items():
     global ITEMS
     ITEMS = get_items()
