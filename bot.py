@@ -133,6 +133,7 @@ def add400_command(message):
         return
 
     add_item(title, price, city, kind="under400")
+    refresh_items()
     bot.send_message(message.chat.id, f"✅ Добавлено (До 400₽):\n{title}\n🟡 {price} ₽\n📍 {city}")
 
 def get_items():
