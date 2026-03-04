@@ -243,7 +243,7 @@ def start(message):
 
     # item = (id, title, price, city)
     text = f"🧥 {item[1]}\n"
-    text += ("🟢 Бесплатно\n" if item[2] == 0 else f"🟡 {item[2]} ₽\n"
+    text += ("🟢 Бесплатно\n" if item[2] == 0 else f"🟡 {item[2]} ₽\n")
     text += f"📍 {item[3]}"
 
     bot.send_message(chat_id, text, reply_markup=build_card_keyboard())
