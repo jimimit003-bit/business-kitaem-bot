@@ -1,5 +1,6 @@
 import telebot
 import sys
+import os
 import sqlite3
 print("=== BOT STARTING ===", flush=True)
 sys.stdout.flush()
@@ -18,7 +19,9 @@ ST_ADD_CONFIRM = 14
 user_state = {}     # chat_id -> state
 user_draft = {}     # chat_id -> dict(kind,title,price,city)
 # === DATABASE ===
-conn = sqlite3.connect("darom.db", check_same_thread=False)
+DB_PATH = os.environ.get("DB_PATH", "darom.db")
+
+conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 cursor = conn.cursor()
 
 # Таблица пользователей
