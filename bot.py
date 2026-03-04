@@ -289,8 +289,12 @@ def echo(message):
 @bot.callback_query_handler(func=lambda call: True)
 def handle_buttons(call):
     chat_id = call.message.chat.id
+    refresh_items()
 
-    # текущий индекс (если не был задан — 0)
+    if not ITEMS:
+        bot.answer_callback_query(call.id, "Пока нет объявлений")
+        return
+        # текущий индекс (если не был задан — 0)
     idx = user_state.get(chat_id, 0)
 
     if call.data == "next":
