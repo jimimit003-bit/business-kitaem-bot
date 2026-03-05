@@ -111,7 +111,7 @@ def handle_photo(message):
     cursor.execute(
     "INSERT INTO items (title, price, city, kind) VALUES (?, ?, ?, ?)",
     ("Фото товар", 0, "Не указан", "photo")
-)
+) 
 
     conn.commit()
     conn.close()
