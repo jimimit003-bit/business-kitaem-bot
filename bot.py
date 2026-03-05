@@ -102,7 +102,9 @@ def add_item(title: str, price: int, city: str, kind: str = "any"):
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
     photo_id = message.photo[-1].file_id
-
+    
+    bot.send_message(message.chat.id, "📸 Фото получено!")
+    
     conn = sqlite3.connect("items.db")
     cursor = conn.cursor()
 
