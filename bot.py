@@ -93,10 +93,10 @@ def remove_favorite(user_id: int, item_id: int):
         (user_id, item_id)
     )
     conn.commit()
-def add_item(title: str, price: int, city: str, kind: str = "any"):
+def add_item(title: str, price: int, city: str, kind: str = "any", photo_id: str | None = None):
     cursor.execute(
-        "INSERT INTO items (title, price, city, kind) VALUES (?, ?, ?, ?)",
-        (title, price, city, kind)
+        "INSERT INTO items (title, price, city, kind, photo_id) VALUES (?, ?, ?, ?, ?)",
+        (title, price, city, kind, photo_id)
     )
     conn.commit()
 @bot.message_handler(content_types=['photo'])
