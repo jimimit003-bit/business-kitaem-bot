@@ -49,6 +49,12 @@ try:
     conn.commit()
 except:
     pass
+# добавляем колонку photo_id если её нет
+try:
+    cursor.execute("ALTER TABLE items ADD COLUMN photo_id TEXT")
+    conn.commit()
+except:
+    pass
 # Таблица избранного
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS favorites (
