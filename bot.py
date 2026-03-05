@@ -4,7 +4,8 @@ import os
 import sqlite3
 print("=== BOT STARTING ===", flush=True)
 sys.stdout.flush()
-TOKEN = "8516444407:AAGseUj72idFT6b86hbg1W8qI48BIT_kd4Q"
+import os
+TOKEN = os.getenv("TOKEN")
 bot = telebot.TeleBot(TOKEN)
 from telebot import types
 ITEMS = []
