@@ -99,6 +99,22 @@ def add_item(title: str, price: int, city: str, kind: str = "any"):
         (title, price, city, kind)
     )
     conn.commit()
+@bot.message_handler(content_types=['photo'])
+def handle_photo(message):
+    photo_id = message.photo[-1].file_id
+
+    conn = sqlite3.connect("items.db")
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "INSERT INTO items (title, price, city, photo_id) VALUES (?, ?, ?, ?)",
+        ("Фото товар", 0, "Не указан", photo_id)
+    )
+
+    conn.commit()
+    conn.close()
+
+    bot.send_message(message.chat.id, "📸 Фото сохранено!")
 @bot.message_handler(commands=['addfree'])
 def addfree_command(message):
     # формат: /addfree Название;Город
