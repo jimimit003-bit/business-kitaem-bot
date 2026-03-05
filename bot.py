@@ -423,5 +423,7 @@ def cancel_flow(message):
 
 
     
-print("Bot started...")
-bot.infinity_polling()
+if __name__ == "__main__":
+    print("=== BOT STARTING ===")
+    bot.remove_webhook()
+    bot.infinity_polling(skip_pending=True)
