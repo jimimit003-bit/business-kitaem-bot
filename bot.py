@@ -427,20 +427,18 @@ import time
 from telebot.apihelper import ApiTelegramException
 
 if __name__ == "__main__":
-    print("=== BOT STARTING ===")
+    print("=== BOT STARTING ===", flush=True)
 
     while True:
         try:
-            bot.remove_webhook(drop_pending_updates=True)
-            bot.infinity_polling(skip_pending=True, timeout=60, long_polling_timeout=60)
-
+            bot.remove_webhook()  # ВАЖНО: без drop_pending_updates
+            bot.infinity_polling(skip_pending=True)
         except ApiTelegramException as e:
             if "409" in str(e):
-                print("409 conflict: another instance is running. Sleep 10s...")
+                print("409 conflict: another getUpdates is running. Waiting 10s...", e)
                 time.sleep(10)
                 continue
             raise
-
         except Exception as e:
             print("Unexpected error:", e)
             time.sleep(5)
