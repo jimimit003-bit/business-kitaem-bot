@@ -106,12 +106,12 @@ def handle_photo(message):
     bot.send_message(message.chat.id, "📸 Фото получено!")
     
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-cursor = conn.cursor()
+    cursor = conn.cursor()
 
     cursor.execute(
-    "INSERT INTO items (title, price, city, kind) VALUES (?, ?, ?, ?)",
-    ("Фото товар", 0, "Не указан", "photo")
-) 
+        "INSERT INTO items (title, price, city, kind) VALUES (?, ?, ?, ?)",
+        ("Фото товар", 0, "Не указан", "photo")
+    ) 
 
     conn.commit()
     conn.close()
