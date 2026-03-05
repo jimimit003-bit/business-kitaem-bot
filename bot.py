@@ -423,7 +423,24 @@ def cancel_flow(message):
 
 
     
+import time
+from telebot.apihelper import ApiTelegramException
+
 if __name__ == "__main__":
     print("=== BOT STARTING ===")
-    bot.remove_webhook()
-    bot.infinity_polling(skip_pending=True)
+
+    while True:
+        try:
+            bot.remove_webhook(drop_pending_updates=True)
+            bot.infinity_polling(skip_pending=True, timeout=60, long_polling_timeout=60)
+
+        except ApiTelegramException as e:
+            if "409" in str(e):
+                print("409 conflict: another instance is running. Sleep 10s...")
+                time.sleep(10)
+                continue
+            raise
+
+        except Exception as e:
+            print("Unexpected error:", e)
+            time.sleep(5)
