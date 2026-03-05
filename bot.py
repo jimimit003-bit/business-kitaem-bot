@@ -431,7 +431,6 @@ if __name__ == "__main__":
 
     while True:
         try:
-            bot.remove_webhook()  # ВАЖНО: без drop_pending_updates
             bot.infinity_polling(skip_pending=True)
         except ApiTelegramException as e:
             if "409" in str(e):
