@@ -39,7 +39,8 @@ CREATE TABLE IF NOT EXISTS items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT,
     price INTEGER,
-    city TEXT
+    city TEXT,
+    photo_id TEXT
 )
 """)
 # добавляем колонку kind если её нет
