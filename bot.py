@@ -440,21 +440,8 @@ def cancel_flow(message):
 
 
     
-import time
-from telebot.apihelper import ApiTelegramException
-
 if __name__ == "__main__":
     print("=== BOT STARTING ===", flush=True)
-
-    while True:
-        try:
-            bot.remove_webhook()
-            print("Webhook removed", flush=True)
-
-            bot.infinity_polling(skip_pending=True)
-        except ApiTelegramException as e:
-            print(f"Telegram error: {e}", flush=True)
-            time.sleep(5)
-        except Exception as e:
-            print(f"Unexpected error: {e}", flush=True)
-            time.sleep(5)
+    bot.remove_webhook()
+    print("Webhook removed", flush=True)
+    bot.infinity_polling(timeout=30, long_polling_timeout=30)
