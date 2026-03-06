@@ -346,7 +346,7 @@ def handle_buttons(call):
     idx = user_state.get(chat_id, 0)
 
     if call.data == "next":
-    chat_id = call.message.chat.id
+        chat_id = call.message.chat.id
 
     if chat_id not in user_state:
         user_state[chat_id] = 0
