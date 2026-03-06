@@ -6,7 +6,6 @@ import telebot
 from telebot import types
 from telebot.apihelper import ApiTelegramException
 
-
 TOKEN = os.getenv("TOKEN")
 if not TOKEN:
     raise ValueError("TOKEN не найден в переменных окружения")
@@ -15,7 +14,9 @@ DB_PATH = os.getenv("DB_PATH", "darom.db")
 
 bot = telebot.TeleBot(TOKEN)
 
-# ========= DATABASE =========
+# =========================
+# DB
+# =========================
 conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 cursor = conn.cursor()
 
@@ -34,7 +35,8 @@ CREATE TABLE IF NOT EXISTS items (
     city TEXT NOT NULL,
     category TEXT NOT NULL DEFAULT 'Без категории',
     photo_id TEXT,
-    owner_tg INTEGER NOT NULL
+    owner_tg INTEGER NOT NULL,
+    views INTEGER NOT NULL DEFAULT 0
 )
 """)
 
@@ -56,19 +58,31 @@ CREATE TABLE IF NOT EXISTS likes (
 )
 """)
 
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS referrals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    inviter_tg INTEGER NOT NULL,
+    invited_tg INTEGER NOT NULL,
+    UNIQUE(inviter_tg, invited_tg)
+)
+""")
+
 conn.commit()
 
-# ========= MEMORY =========
+# =========================
+# MEMORY
+# =========================
 ITEMS = []
 user_index = {}          # chat_id -> current card index
-pending_addphoto = {}    # chat_id -> {"title":..., "price":..., "city":..., "category":...}
+pending_addphoto = {}    # chat_id -> {"title","price","city","category"}
 
-
-# ========= DB HELPERS =========
+# =========================
+# DB HELPERS
+# =========================
 def refresh_items():
     global ITEMS
     cursor.execute("""
-        SELECT id, title, price, city, category, photo_id, owner_tg
+        SELECT id, title, price, city, category, photo_id, owner_tg, views
         FROM items
         ORDER BY id DESC
     """)
@@ -92,8 +106,8 @@ def get_user_id(telegram_id: int) -> int:
 
 def add_item(title: str, price: int, city: str, category: str, owner_tg: int, photo_id: str | None = None):
     cursor.execute("""
-        INSERT INTO items (title, price, city, category, photo_id, owner_tg)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO items (title, price, city, category, photo_id, owner_tg, views)
+        VALUES (?, ?, ?, ?, ?, ?, 0)
     """, (title, price, city, category, photo_id, owner_tg))
     conn.commit()
     refresh_items()
@@ -108,12 +122,23 @@ def get_item_by_index(idx: int):
 
 def get_user_items(owner_tg: int):
     cursor.execute("""
-        SELECT id, title, price, city, category, photo_id, owner_tg
+        SELECT id, title, price, city, category, photo_id, owner_tg, views
         FROM items
         WHERE owner_tg = ?
         ORDER BY id DESC
     """, (owner_tg,))
     return cursor.fetchall()
+
+
+def delete_item(item_id: int, owner_tg: int) -> bool:
+    cursor.execute(
+        "DELETE FROM items WHERE id = ? AND owner_tg = ?",
+        (item_id, owner_tg)
+    )
+    deleted = cursor.rowcount > 0
+    conn.commit()
+    refresh_items()
+    return deleted
 
 
 def add_favorite(user_id: int, item_id: int):
@@ -167,7 +192,45 @@ def get_likes_count(item_id: int) -> int:
     return row[0] if row else 0
 
 
-# ========= UI HELPERS =========
+def add_view(item_id: int):
+    cursor.execute(
+        "UPDATE items SET views = views + 1 WHERE id = ?",
+        (item_id,)
+    )
+    conn.commit()
+
+
+def get_views_count(item_id: int) -> int:
+    cursor.execute(
+        "SELECT views FROM items WHERE id = ?",
+        (item_id,)
+    )
+    row = cursor.fetchone()
+    return row[0] if row else 0
+
+
+def add_referral(inviter_tg: int, invited_tg: int):
+    if inviter_tg == invited_tg:
+        return
+    cursor.execute(
+        "INSERT OR IGNORE INTO referrals (inviter_tg, invited_tg) VALUES (?, ?)",
+        (inviter_tg, invited_tg)
+    )
+    conn.commit()
+
+
+def get_referrals_count(inviter_tg: int) -> int:
+    cursor.execute(
+        "SELECT COUNT(*) FROM referrals WHERE inviter_tg = ?",
+        (inviter_tg,)
+    )
+    row = cursor.fetchone()
+    return row[0] if row else 0
+
+
+# =========================
+# UI HELPERS
+# =========================
 def main_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     kb.row(
@@ -179,12 +242,13 @@ def main_menu():
         types.KeyboardButton("➕ Добавить")
     )
     kb.row(
-        types.KeyboardButton("♻ Сбросить фильтры")
+        types.KeyboardButton("🎁 Пригласить друга"),
+        types.KeyboardButton("📊 Моя статистика")
     )
     return kb
 
 
-def build_card_keyboard(item_id: int, viewer_tg: int):
+def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
     viewer_user_id = get_user_id(viewer_tg)
     likes_count = get_likes_count(item_id)
 
@@ -194,24 +258,37 @@ def build_card_keyboard(item_id: int, viewer_tg: int):
         like_text = f"❤️ Лайк ({likes_count})"
 
     kb = types.InlineKeyboardMarkup()
+
     kb.row(
         types.InlineKeyboardButton("➡ Следующее", callback_data="next"),
         types.InlineKeyboardButton(like_text, callback_data="like")
     )
+
     kb.row(
         types.InlineKeyboardButton("❤️ В избранное", callback_data="fav"),
+        types.InlineKeyboardButton("💬 Написать владельцу", url=f"tg://user?id={owner_tg}")
+    )
+
+    kb.row(
         types.InlineKeyboardButton("✅ Забрать", callback_data="take")
     )
+
+    if owner_tg == viewer_tg:
+        kb.row(
+            types.InlineKeyboardButton("🗑 Удалить мое объявление", callback_data="delete")
+        )
+
     return kb
 
 
 def format_item_text(item) -> str:
-    item_id, title, price, city, category, photo_id, owner_tg = item
+    item_id, title, price, city, category, photo_id, owner_tg, views = item
 
     text = f"🧥 {title}\n"
     text += "🟢 Бесплатно\n" if price == 0 else f"💰 {price} ₽\n"
     text += f"📍 {city}\n"
-    text += f"📦 {category}"
+    text += f"📦 {category}\n"
+    text += f"👁 {views} просмотров"
     return text
 
 
@@ -219,14 +296,29 @@ def show_item(chat_id: int, item, send_new: bool = True, edit_message_id: int | 
     if not item:
         bot.send_message(
             chat_id,
-            "Пока нет объявлений 😕\nДобавь первое командой:\n/add Куртка;0;Москва;Одежда",
+            "Пока нет объявлений 😕\n"
+            "Добавь первое командой:\n"
+            "/add Куртка;0;Москва;Одежда",
             reply_markup=main_menu()
         )
         return
 
-    item_id, title, price, city, category, photo_id, owner_tg = item
-    text = format_item_text(item)
-    reply_markup = build_card_keyboard(item_id, chat_id)
+    item_id, title, price, city, category, photo_id, owner_tg, views = item
+
+    add_view(item_id)
+    refresh_items()
+
+    # перечитываем обновлённый item с новым views
+    cursor.execute("""
+        SELECT id, title, price, city, category, photo_id, owner_tg, views
+        FROM items
+        WHERE id = ?
+    """, (item_id,))
+    fresh_item = cursor.fetchone()
+
+    text = format_item_text(fresh_item)
+    reply_markup = build_card_keyboard(item_id, chat_id, owner_tg)
+    photo_id = fresh_item[5]
 
     if photo_id:
         if edit_message_id is not None:
@@ -247,12 +339,23 @@ def show_item(chat_id: int, item, send_new: bool = True, edit_message_id: int | 
             )
 
 
-# ========= COMMANDS =========
+# =========================
+# COMMANDS
+# =========================
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     chat_id = message.chat.id
-    get_user_id(chat_id)
 
+    # реферальная ссылка: /start ref_123456
+    parts = message.text.split()
+    if len(parts) > 1 and parts[1].startswith("ref_"):
+        try:
+            inviter_tg = int(parts[1].replace("ref_", ""))
+            add_referral(inviter_tg, chat_id)
+        except ValueError:
+            pass
+
+    get_user_id(chat_id)
     refresh_items()
     user_index[chat_id] = 0
 
@@ -272,7 +375,8 @@ def add_cmd(message):
     if len(parts) < 4:
         bot.send_message(
             chat_id,
-            "❌ Формат:\n/add Название;Цена;Город;Категория\n\nПример:\n/add Куртка;0;Москва;Одежда"
+            "❌ Формат:\n/add Название;Цена;Город;Категория\n\n"
+            "Пример:\n/add Куртка;0;Москва;Одежда"
         )
         return
 
@@ -294,9 +398,10 @@ def add_cmd(message):
 
     bot.send_message(
         chat_id,
-        f"✅ Добавлено:\n🧥 {title}\n" +
-        ("🟢 Бесплатно\n" if price == 0 else f"💰 {price} ₽\n") +
-        f"📍 {city}\n📦 {category}",
+        f"✅ Добавлено:\n🧥 {title}\n"
+        + ("🟢 Бесплатно\n" if price == 0 else f"💰 {price} ₽\n")
+        + f"📍 {city}\n"
+        + f"📦 {category}",
         reply_markup=main_menu()
     )
 
@@ -311,7 +416,8 @@ def addphoto_cmd(message):
     if len(parts) < 4:
         bot.send_message(
             chat_id,
-            "❌ Формат:\n/addphoto Название;Цена;Город;Категория\n\nПример:\n/addphoto Поло;0;Москва;Одежда"
+            "❌ Формат:\n/addphoto Название;Цена;Город;Категория\n\n"
+            "Пример:\n/addphoto Поло;0;Москва;Одежда"
         )
         return
 
@@ -335,7 +441,9 @@ def addphoto_cmd(message):
     bot.send_message(chat_id, "📸 Теперь отправь фото одним следующим сообщением")
 
 
-# ========= PHOTO =========
+# =========================
+# PHOTO
+# =========================
 @bot.message_handler(content_types=['photo'])
 def photo_handler(message):
     chat_id = message.chat.id
@@ -367,10 +475,15 @@ def photo_handler(message):
     )
 
 
-# ========= MENU BUTTONS =========
+# =========================
+# MENU BUTTONS
+# =========================
 @bot.message_handler(func=lambda m: m.text == "🏠 Смотреть")
 def menu_watch(message):
-    start_cmd(message)
+    refresh_items()
+    user_index[message.chat.id] = 0
+    item = get_item_by_index(0)
+    show_item(message.chat.id, item)
 
 
 @bot.message_handler(func=lambda m: m.text == "➕ Добавить")
@@ -397,10 +510,10 @@ def menu_my_items(message):
 
     text = "📦 Мои объявления:\n\n"
     for item in rows[:20]:
-        item_id, title, price, city, category, photo_id, owner_tg = item
+        item_id, title, price, city, category, photo_id, owner_tg, views = item
         text += f"#{item_id} — {title} | "
         text += "Бесплатно" if price == 0 else f"{price} ₽"
-        text += f" | {city} | {category}\n"
+        text += f" | {city} | {category} | 👁 {views}\n"
 
     bot.send_message(chat_id, text)
 
@@ -417,7 +530,7 @@ def menu_favorites(message):
 
     placeholders = ",".join(["?"] * len(fav_ids))
     cursor.execute(f"""
-        SELECT id, title, price, city, category, photo_id, owner_tg
+        SELECT id, title, price, city, category, photo_id, owner_tg, views
         FROM items
         WHERE id IN ({placeholders})
         ORDER BY id DESC
@@ -426,20 +539,49 @@ def menu_favorites(message):
 
     text = "❤️ Избранное:\n\n"
     for item in rows[:20]:
-        item_id, title, price, city, category, photo_id, owner_tg = item
+        item_id, title, price, city, category, photo_id, owner_tg, views = item
         text += f"#{item_id} — {title} | "
         text += "Бесплатно" if price == 0 else f"{price} ₽"
-        text += f" | {city} | {category}\n"
+        text += f" | {city} | {category} | 👁 {views}\n"
 
     bot.send_message(chat_id, text)
 
 
-@bot.message_handler(func=lambda m: m.text == "♻ Сбросить фильтры")
-def menu_reset(message):
-    bot.send_message(message.chat.id, "Фильтры сброшены ♻", reply_markup=main_menu())
+@bot.message_handler(func=lambda m: m.text == "🎁 Пригласить друга")
+def menu_invite(message):
+    me = bot.get_me()
+    invite_link = f"https://t.me/{me.username}?start=ref_{message.chat.id}"
+
+    count = get_referrals_count(message.chat.id)
+
+    bot.send_message(
+        message.chat.id,
+        "🎁 Пригласи друга по своей ссылке:\n\n"
+        f"{invite_link}\n\n"
+        f"Уже приглашено: {count}"
+    )
 
 
-# ========= CALLBACKS =========
+@bot.message_handler(func=lambda m: m.text == "📊 Моя статистика")
+def menu_stats(message):
+    chat_id = message.chat.id
+    refs = get_referrals_count(chat_id)
+    my_items = get_user_items(chat_id)
+
+    total_views = sum(item[7] for item in my_items) if my_items else 0
+
+    text = (
+        f"📊 Твоя статистика:\n\n"
+        f"👥 Приглашено друзей: {refs}\n"
+        f"📦 Твоих объявлений: {len(my_items)}\n"
+        f"👁 Просмотров объявлений: {total_views}"
+    )
+    bot.send_message(chat_id, text)
+
+
+# =========================
+# CALLBACKS
+# =========================
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     chat_id = call.message.chat.id
@@ -455,25 +597,7 @@ def callback_handler(call):
         user_index[chat_id] = idx
 
         item = ITEMS[idx]
-        item_id, title, price, city, category, photo_id, owner_tg = item
-
-        text = format_item_text(item)
-        reply_markup = build_card_keyboard(item_id, chat_id)
-
-        if photo_id:
-            try:
-                bot.delete_message(chat_id, call.message.message_id)
-            except Exception:
-                pass
-            bot.send_photo(chat_id, photo_id, caption=text, reply_markup=reply_markup)
-        else:
-            bot.edit_message_text(
-                text=text,
-                chat_id=chat_id,
-                message_id=call.message.message_id,
-                reply_markup=reply_markup
-            )
-
+        show_item(chat_id, item, send_new=False, edit_message_id=call.message.message_id)
         bot.answer_callback_query(call.id)
 
     elif call.data == "like":
@@ -489,23 +613,9 @@ def callback_handler(call):
             add_like(user_id, item_id)
             bot.answer_callback_query(call.id, "Лайк поставлен")
 
-        text = format_item_text(item)
-        reply_markup = build_card_keyboard(item_id, chat_id)
-        photo_id = item[5]
-
-        if photo_id:
-            try:
-                bot.delete_message(chat_id, call.message.message_id)
-            except Exception:
-                pass
-            bot.send_photo(chat_id, photo_id, caption=text, reply_markup=reply_markup)
-        else:
-            bot.edit_message_text(
-                text=text,
-                chat_id=chat_id,
-                message_id=call.message.message_id,
-                reply_markup=reply_markup
-            )
+        refresh_items()
+        item = ITEMS[idx % len(ITEMS)]
+        show_item(chat_id, item, send_new=False, edit_message_id=call.message.message_id)
 
     elif call.data == "fav":
         idx = user_index.get(chat_id, 0)
@@ -517,10 +627,43 @@ def callback_handler(call):
         bot.answer_callback_query(call.id, "Добавлено в избранное ❤️")
 
     elif call.data == "take":
-        bot.answer_callback_query(call.id, "Отмечено ✅")
+        bot.answer_callback_query(call.id, "Свяжись с владельцем через кнопку 💬")
+
+    elif call.data == "delete":
+        idx = user_index.get(chat_id, 0)
+        item = ITEMS[idx]
+        item_id = item[0]
+        owner_tg = item[6]
+
+        if owner_tg != chat_id:
+            bot.answer_callback_query(call.id, "Это не твоё объявление")
+            return
+
+        ok = delete_item(item_id, chat_id)
+        if ok:
+            bot.answer_callback_query(call.id, "Удалено 🗑")
+            try:
+                bot.delete_message(chat_id, call.message.message_id)
+            except Exception:
+                pass
+
+            refresh_items()
+            if ITEMS:
+                user_index[chat_id] = 0
+                show_item(chat_id, get_item_by_index(0))
+            else:
+                bot.send_message(
+                    chat_id,
+                    "Объявлений больше нет",
+                    reply_markup=main_menu()
+                )
+        else:
+            bot.answer_callback_query(call.id, "Не удалось удалить")
 
 
-# ========= SAFE POLLING =========
+# =========================
+# SAFE POLLING
+# =========================
 def run_bot():
     print("=== BOT STARTING ===", flush=True)
     bot.remove_webhook()
@@ -528,7 +671,7 @@ def run_bot():
 
     while True:
         try:
-            bot.infinity_polling(timeout=30, long_polling_timeout=20)
+            bot.infinity_polling(timeout=30, long_polling_timeout=20, skip_pending=True)
         except ApiTelegramException as e:
             print(f"Telegram error: {e}", flush=True)
             time.sleep(5)
