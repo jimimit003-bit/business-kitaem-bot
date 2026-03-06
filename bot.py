@@ -335,22 +335,39 @@ def handle_buttons(call):
     idx = user_state.get(chat_id, 0)
 
     if call.data == "next":
-        idx = (idx + 1) % len(ITEMS)
-        user_state[chat_id] = idx
+    chat_id = call.message.chat.id
 
-        item = ITEMS[idx]
+    if chat_id not in user_state:
+        user_state[chat_id] = 0
 
-        text = f"🧥 {item['title']}\n"
-        text += f"🟢 Бесплатно\n" if item['price'] == 0 else f"🟡 {item['price']}₽\n"
-        text += f"📍 {item['city']}"
+    user_state[chat_id] += 1
+    item = get_item_by_index(user_state[chat_id])
 
-        bot.edit_message_text(
-            text,
-            chat_id,
-            call.message.message_id,
-            reply_markup=build_card_keyboard()
-        )
-        bot.answer_callback_query(call.id, "Следующая ✅")
+    if not item:
+        bot.answer_callback_query(call.id, "Объявлений нет")
+        return
+
+    title = item[1]
+    price = item[2]
+    city = item[3]
+    kind = item[4] if len(item) > 4 else "regular"
+    photo_id = item[5] if len(item) > 5 else None
+
+    text = f"🧥 {title}\n"
+    text += ("🟢 Бесплатно\n" if price == 0 else f"🟡 {price} ₽\n")
+    text += f"📍 {city}"
+
+    try:
+        bot.delete_message(chat_id, call.message.message_id)
+    except:
+        pass
+
+    if photo_id:
+        bot.send_photo(chat_id, photo_id, caption=text, reply_markup=build_card_keyboard())
+    else:
+        bot.send_message(chat_id, text, reply_markup=build_card_keyboard())
+
+    bot.answer_callback_query(call.id)
 
     elif call.data == "take":
         bot.answer_callback_query(call.id, "Забрал ✅")
