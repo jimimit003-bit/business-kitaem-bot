@@ -12,6 +12,7 @@ if not TOKEN:
 DB_PATH = os.getenv("DB_PATH", "darom.db")
 
 bot = telebot.TeleBot(TOKEN)
+print("BOT OBJECT CREATED", flush=True)
 
 # ===== DATABASE =====
 conn = sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -49,7 +50,6 @@ def get_item_by_index(idx: int):
 
 
 # ===== STATE =====
-# chat_id -> current card index
 user_state = {}
 
 
@@ -64,9 +64,7 @@ def build_card_keyboard():
 
 # ===== HELPERS =====
 def format_item_text(item) -> str:
-    # item = (id, title, price, city)
     _, title, price, city = item
-
     text = f"🧥 {title}\n"
     text += ("🟢 Бесплатно\n" if price == 0 else f"💰 {price} ₽\n")
     text += f"📍 {city}"
@@ -100,9 +98,6 @@ def start_command(message):
 @bot.message_handler(commands=["add"])
 def add_command(message):
     chat_id = message.chat.id
-
-    # Ожидаем формат:
-    # /add Куртка;0;Москва
     raw_text = message.text.replace("/add", "", 1).strip()
 
     if not raw_text:
@@ -178,13 +173,11 @@ def next_callback(call):
             reply_markup=build_card_keyboard()
         )
     except Exception:
-        # Если редактирование не получилось, просто отправим новое сообщение
         bot.send_message(chat_id, text, reply_markup=build_card_keyboard())
 
     bot.answer_callback_query(call.id)
 
 
-# ===== FALLBACK =====
 @bot.message_handler(func=lambda message: True)
 def fallback(message):
     bot.send_message(
@@ -196,9 +189,7 @@ def fallback(message):
     )
 
 
-# ===== RUN =====
 if __name__ == "__main__":
-    print("BOT OBJECT CREATED", flush=True)
     bot.remove_webhook()
     print("Webhook removed", flush=True)
-    bot.infinity_polling(skip_pending=True, timeout=30, long_polling_timeout=30)
+    bot.infinity_polling(timeout=30, long_polling_timeout=30)
