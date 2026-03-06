@@ -346,7 +346,7 @@ def handle_buttons(call):
         # текущий индекс (если не был задан — 0)
     idx = user_state.get(chat_id, 0)
 
-        if call.data == "next":
+    if call.data == "next":
         idx = user_state.get(chat_id, 0)
         idx = (idx + 1) % len(ITEMS)
         user_state[chat_id] = idx
