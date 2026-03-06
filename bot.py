@@ -171,11 +171,19 @@ def refresh_items():
     global ITEMS
     ITEMS = get_items()
 
-def get_item_by_index(idx: int):
-    items = get_items()
-    if not items:
-        return None
-    return items[idx % len(items)]
+def get_item_by_index(index):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id, title, price, city, kind, photo_id FROM items LIMIT 1 OFFSET ?",
+        (index,)
+    )
+
+    item = cursor.fetchone()
+    conn.close()
+
+    return item
 
 
 def get_favorites(user_id: int):
