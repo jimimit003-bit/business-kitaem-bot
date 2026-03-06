@@ -263,11 +263,15 @@ def start(message):
     user_state[chat_id] = 0
 
     item = get_item_by_index(0)
+
     if not item:
-        bot.send_message(chat_id, "Пока нет объявлений 😕\nДобавь первое командой:\n/add Куртка;0;Москва")
+        bot.send_message(
+            chat_id,
+            "Пока нет объявлений 😕\nДобавь первое командой:\n/add Куртка;0;Москва",
+            reply_markup=types.ReplyKeyboardRemove()
+        )
         return
 
-    # если item = (id, title, price, city, kind, photo_id)
     title = item[1]
     price = item[2]
     city = item[3]
@@ -279,11 +283,18 @@ def start(message):
     text += f"📍 {city}"
 
     if photo_id:
-        bot.send_photo(chat_id, photo_id, caption=text, reply_markup=build_card_keyboard())
+        bot.send_photo(
+            chat_id,
+            photo_id,
+            caption=text,
+            reply_markup=build_card_keyboard()
+        )
     else:
-        bot.send_message(chat_id, text, reply_markup=build_card_keyboard())
-
-    bot.send_message(chat_id, text, reply_markup=build_card_keyboard())
+        bot.send_message(
+            chat_id,
+            text,
+            reply_markup=build_card_keyboard()
+        )
 @bot.message_handler(commands=['add'])
 def add_command(message):
     text = message.text.replace('/add', '', 1).strip()
