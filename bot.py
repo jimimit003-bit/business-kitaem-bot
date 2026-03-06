@@ -470,13 +470,13 @@ if __name__ == "__main__":
 
     while True:
         try:
+            bot.remove_webhook()
+            print("Webhook removed", flush=True)
+
             bot.infinity_polling(skip_pending=True)
         except ApiTelegramException as e:
-            if "409" in str(e):
-                print("409 conflict: another getUpdates is running. Waiting 10s...", e)
-                time.sleep(10)
-                continue
-            raise
+            print(f"Telegram error: {e}", flush=True)
+            time.sleep(5)
         except Exception as e:
-            print("Unexpected error:", e)
+            print(f"Unexpected error: {e}", flush=True)
             time.sleep(5)
