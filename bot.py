@@ -7,6 +7,7 @@ sys.stdout.flush()
 import os
 TOKEN = os.getenv("TOKEN")
 bot = telebot.TeleBot(TOKEN)
+print("BOT OBJECT CREATED", flush=True)
 from telebot import types
 ITEMS = []
 # === CREATE FLOW STATES ===
