@@ -346,93 +346,62 @@ def handle_buttons(call):
         # текущий индекс (если не был задан — 0)
     idx = user_state.get(chat_id, 0)
 
-    if call.data == "next":
-        chat_id = call.message.chat.id
+        if call.data == "next":
+        idx = user_state.get(chat_id, 0)
+        idx = (idx + 1) % len(ITEMS)
+        user_state[chat_id] = idx
 
-    if chat_id not in user_state:
-        user_state[chat_id] = 0
+        item = ITEMS[idx]
 
-    user_state[chat_id] += 1
-    item = get_item_by_index(user_state[chat_id])
+        title = item[1]
+        price = item[2]
+        city = item[3]
+        kind = item[4] if len(item) > 4 else "regular"
+        photo_id = item[5] if len(item) > 5 else None
 
-    if not item:
-        bot.answer_callback_query(call.id, "Объявлений нет")
-        return
+        text = f"🧥 {title}\n"
+        text += ("🟢 Бесплатно\n" if price == 0 else f"🟡 {price} ₽\n")
+        text += f"📍 {city}"
 
-    title = item[1]
-    price = item[2]
-    city = item[3]
-    kind = item[4] if len(item) > 4 else "regular"
-    photo_id = item[5] if len(item) > 5 else None
+        if photo_id:
+            bot.send_photo(
+                chat_id,
+                photo_id,
+                caption=text,
+                reply_markup=build_card_keyboard()
+            )
+        else:
+            bot.send_message(
+                chat_id,
+                text,
+                reply_markup=build_card_keyboard()
+            )
 
-    text = f"🧥 {title}\n"
-    text += ("🟢 Бесплатно\n" if price == 0 else f"🟡 {price} ₽\n")
-    text += f"📍 {city}"
-
-    try:
-        bot.delete_message(chat_id, call.message.message_id)
-    except:
-        pass
-
-    if photo_id:
-        bot.send_photo(chat_id, photo_id, caption=text, reply_markup=build_card_keyboard())
-    else:
-        bot.send_message(chat_id, text, reply_markup=build_card_keyboard())
-
-    bot.answer_callback_query(call.id)
+        bot.answer_callback_query(call.id)
 
     elif call.data == "take":
-        bot.answer_callback_query(call.id, "Забрал ✅")
+        bot.answer_callback_query(call.id, "✅ Забрано")
 
     elif call.data == "fav":
         idx = user_state.get(chat_id, 0)
-        add_favorite(chat_id, idx)
-        bot.answer_callback_query(call.id, "Добавил в ❤️")
+        item = ITEMS[idx]
+        item_id = item[0]
+        user_id = get_user_id(chat_id)
+        add_favorite(user_id, item_id)
+        bot.answer_callback_query(call.id, "❤️ Добавлено в избранное")
 
     elif call.data == "reset":
         user_state[chat_id] = 0
-        bot.answer_callback_query(call.id, "Сбросил 🔄")
+        bot.answer_callback_query(call.id, "♻️ Сброшено")
 
-    elif call.data == "near":
-        bot.answer_callback_query(call.id, "Ищу рядом 📍")
+    elif call.data == "set_price_free":
+        bot.answer_callback_query(call.id, "🟢 Фильтр: бесплатно")
 
-    elif call.data == "map":
-        bot.answer_callback_query(call.id, "Открываю карту 📍")
+    elif call.data == "set_price_400":
+        bot.answer_callback_query(call.id, "🟡 Фильтр: до 400 ₽")
 
-    elif call.data == "f_price":
-        bot.edit_message_text(
-            "💰 Цена — выбери вариант:",
-            chat_id,
-            call.message.message_id,
-            reply_markup=build_price_menu()
-        )
-        bot.answer_callback_query(call.id)
-
-    elif call.data == "back_to_card":
-        # возвращаем текущую карточку
-        idx = user_state.get(chat_id, 0)
-        item = ITEMS[idx]
-
-        text = f"🧥 {item['title']}\n"
-        text += f"🟢 Бесплатно\n" if item['price'] == 0 else f"🟡 {item['price']}₽\n"
-        text += f"📍 {item['city']}"
-
-        bot.edit_message_text(
-            text,
-            chat_id,
-            call.message.message_id,
-            reply_markup=build_card_keyboard()
-        )
-        bot.answer_callback_query(call.id)
-    elif call.data == "add_item":
-        user_state[chat_id] = ST_ADD_KIND
-        user_draft[chat_id] = {}
-        bot.send_message(chat_id, "Выберите тип объявления:", reply_markup=kb_choose_kind())
-        bot.answer_callback_query(call.id)
-
-    elif call.data in ("set_price_free", "set_price_400", "set_price_any"):
-        # если фильтр цены пока не делаем — хотя бы не падаем
-        bot.answer_callback_query(call.id)
+    elif call.data == "set_price_any":
+        bot.answer_callback_query(call.id, "⚪️ Фильтр: любая")
 
     else:
         bot.answer_callback_query(call.id)
