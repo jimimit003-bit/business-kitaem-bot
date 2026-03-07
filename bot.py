@@ -401,6 +401,12 @@ def filters_status_text(chat_id: int) -> str:
     )
 
 
+def short_item_label(item):
+    item_id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at = item
+    price_text = "Бесплатно" if price == 0 else f"{price} ₽"
+    return f"#{item_id} {title} | {price_text} | {city}"
+
+
 # =========================
 # UI
 # =========================
@@ -521,8 +527,8 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
 
     if owner_tg == viewer_tg:
         kb.row(
-            types.InlineKeyboardButton("🚀 Поднять", callback_data="bump"),
-            types.InlineKeyboardButton("🗑 Удалить", callback_data="delete")
+            types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}"),
+            types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
         )
     else:
         kb.row(
@@ -549,7 +555,7 @@ def format_item_text(item) -> str:
     return text
 
 
-def show_item(chat_id: int, item, send_new: bool = True, edit_message_id: int | None = None):
+def show_item(chat_id: int, item, send_new: bool = True, edit_message_id: int | None = None, count_view: bool = True):
     if not item:
         total_active = get_total_active_items()
         if total_active == 0:
@@ -568,7 +574,9 @@ def show_item(chat_id: int, item, send_new: bool = True, edit_message_id: int | 
 
     item_id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at = item
 
-    add_view(item_id)
+    if count_view:
+        add_view(item_id)
+
     fresh_item = get_item_by_id(item_id)
 
     if not fresh_item or fresh_item[8] == 1:
@@ -596,6 +604,40 @@ def show_item(chat_id: int, item, send_new: bool = True, edit_message_id: int | 
                 message_id=edit_message_id,
                 reply_markup=reply_markup
             )
+
+
+def show_my_item(chat_id: int, item_id: int):
+    item = get_item_by_id(item_id)
+    if not item:
+        bot.send_message(chat_id, "Объявление не найдено", reply_markup=submenu_menu())
+        return
+
+    if item[6] != chat_id:
+        bot.send_message(chat_id, "Это не твоё объявление", reply_markup=submenu_menu())
+        return
+
+    if item[8] == 1:
+        bot.send_message(chat_id, "Это объявление уже неактивно", reply_markup=submenu_menu())
+        return
+
+    show_item(chat_id, item, count_view=False)
+
+
+def build_my_items_keyboard(owner_tg: int):
+    items = get_user_items(owner_tg)
+    kb = types.InlineKeyboardMarkup()
+
+    active_items = [item for item in items if item[8] == 0]
+
+    for item in active_items[:20]:
+        kb.row(
+            types.InlineKeyboardButton(
+                short_item_label(item),
+                callback_data=f"myitem_{item[0]}"
+            )
+        )
+
+    return kb
 
 
 # =========================
@@ -803,20 +845,16 @@ def menu_sub(message):
 def submenu_my_items(message):
     chat_id = message.chat.id
     rows = get_user_items(chat_id)
+    active_rows = [item for item in rows if item[8] == 0]
 
-    if not rows:
-        bot.send_message(chat_id, "У тебя пока нет своих объявлений", reply_markup=submenu_menu())
+    if not active_rows:
+        bot.send_message(chat_id, "У тебя пока нет активных объявлений", reply_markup=submenu_menu())
         return
 
-    text = "📦 Мои объявления:\n\n"
-    for item in rows[:20]:
-        item_id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at = item
-        status = "Забрано" if is_taken else "Активно"
-        text += f"#{item_id} — {title} | "
-        text += "Бесплатно" if price == 0 else f"{price} ₽"
-        text += f" | {city} | {category} | 👁 {views} | {status}\n"
-
+    text = "📦 Выбери своё объявление:"
+    kb = build_my_items_keyboard(chat_id)
     bot.send_message(chat_id, text, reply_markup=submenu_menu())
+    bot.send_message(chat_id, "Список:", reply_markup=kb)
 
 
 @bot.message_handler(func=lambda m: m.text == "📊 Статистика")
@@ -1024,8 +1062,9 @@ def handle_search_text(message):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     chat_id = call.message.chat.id
+    data = call.data
 
-    if call.data == "next":
+    if data == "next":
         items = get_filtered_items(chat_id)
         if not items:
             bot.answer_callback_query(call.id, "Нет объявлений")
@@ -1038,8 +1077,9 @@ def callback_handler(call):
         item = items[idx]
         show_item(chat_id, item, send_new=False, edit_message_id=call.message.message_id)
         bot.answer_callback_query(call.id)
+        return
 
-    elif call.data == "like":
+    if data == "like":
         items = get_filtered_items(chat_id)
         if not items:
             bot.answer_callback_query(call.id, "Нет объявлений")
@@ -1062,8 +1102,9 @@ def callback_handler(call):
             idx = min(user_index.get(chat_id, 0), len(items) - 1)
             user_index[chat_id] = idx
             show_item(chat_id, items[idx], send_new=False, edit_message_id=call.message.message_id)
+        return
 
-    elif call.data == "fav":
+    if data == "fav":
         items = get_filtered_items(chat_id)
         if not items:
             bot.answer_callback_query(call.id, "Нет объявлений")
@@ -1076,8 +1117,9 @@ def callback_handler(call):
 
         add_favorite(user_id, item_id)
         bot.answer_callback_query(call.id, "Добавлено в избранное ❤️")
+        return
 
-    elif call.data == "take":
+    if data == "take":
         items = get_filtered_items(chat_id)
         if not items:
             bot.answer_callback_query(call.id, "Нет объявлений")
@@ -1092,19 +1134,21 @@ def callback_handler(call):
             return
 
         bot.answer_callback_query(call.id, "Свяжись с владельцем через кнопку 💬")
+        return
 
-    elif call.data == "delete":
-        items = get_filtered_items(chat_id)
-        if not items:
-            bot.answer_callback_query(call.id, "Нет объявлений")
+    if data.startswith("delete_"):
+        try:
+            item_id = int(data.split("_", 1)[1])
+        except ValueError:
+            bot.answer_callback_query(call.id, "Ошибка")
             return
 
-        idx = user_index.get(chat_id, 0) % len(items)
-        item = items[idx]
-        item_id = item[0]
-        owner_tg = item[6]
+        item = get_item_by_id(item_id)
+        if not item:
+            bot.answer_callback_query(call.id, "Уже удалено")
+            return
 
-        if owner_tg != chat_id:
+        if item[6] != chat_id:
             bot.answer_callback_query(call.id, "Это не твоё объявление")
             return
 
@@ -1115,25 +1159,23 @@ def callback_handler(call):
                 bot.delete_message(chat_id, call.message.message_id)
             except Exception:
                 pass
-
-            user_index[chat_id] = 0
-            next_item = get_item_by_index(chat_id, 0)
-            show_item(chat_id, next_item)
         else:
             bot.answer_callback_query(call.id, "Не удалось удалить")
+        return
 
-    elif call.data == "bump":
-        items = get_filtered_items(chat_id)
-        if not items:
-            bot.answer_callback_query(call.id, "Нет объявлений")
+    if data.startswith("bump_"):
+        try:
+            item_id = int(data.split("_", 1)[1])
+        except ValueError:
+            bot.answer_callback_query(call.id, "Ошибка")
             return
 
-        idx = user_index.get(chat_id, 0) % len(items)
-        item = items[idx]
-        item_id = item[0]
-        owner_tg = item[6]
+        item = get_item_by_id(item_id)
+        if not item:
+            bot.answer_callback_query(call.id, "Объявление не найдено")
+            return
 
-        if owner_tg != chat_id:
+        if item[6] != chat_id:
             bot.answer_callback_query(call.id, "Можно поднимать только свои объявления")
             return
 
@@ -1150,11 +1192,25 @@ def callback_handler(call):
             except Exception:
                 pass
 
-            user_index[chat_id] = 0
-            next_item = get_item_by_index(chat_id, 0)
-            show_item(chat_id, next_item)
+            # Покажем уже новое, поднятое объявление владельцу
+            new_items = get_user_items(chat_id)
+            active_items = [x for x in new_items if x[8] == 0]
+            if active_items:
+                show_my_item(chat_id, active_items[0][0])
         else:
             bot.answer_callback_query(call.id, "Не удалось поднять")
+        return
+
+    if data.startswith("myitem_"):
+        try:
+            item_id = int(data.split("_", 1)[1])
+        except ValueError:
+            bot.answer_callback_query(call.id, "Ошибка")
+            return
+
+        bot.answer_callback_query(call.id)
+        show_my_item(chat_id, item_id)
+        return
 
 
 # =========================
@@ -1178,3 +1234,4 @@ def run_bot():
 
 if __name__ == "__main__":
     run_bot()
+
