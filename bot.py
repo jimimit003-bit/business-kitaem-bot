@@ -75,46 +75,40 @@ conn.commit()
 # =========================
 # MEMORY
 # =========================
-user_index = {}          # chat_id -> current card index
-pending_addphoto = {}    # chat_id -> {"title","price","city","category"}
-user_filters = {}        # chat_id -> {"city": None, "category": None, "price": "any"}
-pending_search = set()   # chat_id ожидает поисковый запрос
+user_index = {}          # chat_id -> current item index
+pending_addphoto = {}    # chat_id -> draft for /addphoto
+pending_search = set()   # chat_id waiting for text search
+user_filters = {}        # chat_id -> filters dict
 
 # =========================
 # CONSTANTS
 # =========================
-CATEGORIES = [
-    "Одежда",
-    "Обувь",
-    "Техника",
-    "Дом",
-    "Детское",
-    "Другое"
-]
-
-POPULAR_CITIES = [
-    "Москва",
-    "СПб",
-    "Казань",
-    "Екатеринбург"
-]
-
+POPULAR_CITIES = ["Москва", "СПб", "Казань", "Екатеринбург"]
+CATEGORIES = ["Одежда", "Обувь", "Техника", "Дом", "Детское", "Другое"]
 BUMP_COOLDOWN_SECONDS = 24 * 60 * 60
 
 # =========================
 # HELPERS
 # =========================
+def get_now_ts():
+    return int(time.time())
+
+
 def ensure_filters(chat_id: int):
     if chat_id not in user_filters:
         user_filters[chat_id] = {
             "city": None,
             "category": None,
-            "price": "any"
+            "price": "any",
         }
 
 
-def get_now_ts() -> int:
-    return int(time.time())
+def reset_user_filters(chat_id: int):
+    user_filters[chat_id] = {
+        "city": None,
+        "category": None,
+        "price": "any",
+    }
 
 
 def get_user_id(telegram_id: int) -> int:
@@ -132,7 +126,7 @@ def get_user_id(telegram_id: int) -> int:
     return row[0]
 
 
-def add_item(title: str, price: int, city: str, category: str, owner_tg: int, photo_id: str | None = None):
+def add_item(title: str, price: int, city: str, category: str, owner_tg: int, photo_id=None):
     cursor.execute("""
         INSERT INTO items (title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at)
         VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0)
@@ -245,7 +239,6 @@ def bump_item(item_id: int, owner_tg: int):
         WHERE id = ? AND owner_tg = ?
     """, (item_id, owner_tg))
     row = cursor.fetchone()
-
     if not row:
         return False
 
@@ -393,6 +386,28 @@ def format_seconds_to_human(seconds: int) -> str:
     return f"{minutes} мин"
 
 
+def filters_status_text(chat_id: int) -> str:
+    ensure_filters(chat_id)
+    f = user_filters[chat_id]
+
+    city = f["city"] if f["city"] else "Любой"
+    category = f["category"] if f["category"] else "Любая"
+
+    if f["price"] == "free":
+        price = "Бесплатно"
+    elif f["price"] == "under400":
+        price = "До 400 ₽"
+    else:
+        price = "Любая"
+
+    return (
+        "Текущие фильтры:\n\n"
+        f"📍 Город: {city}\n"
+        f"📦 Категория: {category}\n"
+        f"💰 Цена: {price}"
+    )
+
+
 # =========================
 # UI
 # =========================
@@ -440,6 +455,9 @@ def filters_menu():
     )
     kb.row(
         types.KeyboardButton("💰 Цена"),
+        types.KeyboardButton("🔎 Показать")
+    )
+    kb.row(
         types.KeyboardButton("♻️ Сбросить фильтры")
     )
     kb.row(
@@ -462,7 +480,7 @@ def city_menu():
         types.KeyboardButton("🌍 Любой город")
     )
     kb.row(
-        types.KeyboardButton("⬅️ Назад")
+        types.KeyboardButton("⬅️ К фильтрам")
     )
     return kb
 
@@ -485,7 +503,7 @@ def category_menu():
         types.KeyboardButton("🌍 Любая категория")
     )
     kb.row(
-        types.KeyboardButton("⬅️ Назад")
+        types.KeyboardButton("⬅️ К фильтрам")
     )
     return kb
 
@@ -500,9 +518,16 @@ def price_menu():
         types.KeyboardButton("⚪ Любая цена")
     )
     kb.row(
-        types.KeyboardButton("⬅️ Назад")
+        types.KeyboardButton("⬅️ К фильтрам")
     )
     return kb
+
+
+def show_filters_menu(chat_id: int, notice: str | None = None):
+    text = filters_status_text(chat_id)
+    if notice:
+        text = f"{notice}\n\n{text}"
+    bot.send_message(chat_id, text, reply_markup=filters_menu())
 
 
 def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
@@ -559,11 +584,19 @@ def format_item_text(item) -> str:
 
 def show_item(chat_id: int, item, send_new: bool = True, edit_message_id: int | None = None):
     if not item:
-        bot.send_message(
-            chat_id,
-            "По текущим фильтрам объявлений нет 😕",
-            reply_markup=main_menu()
-        )
+        total_active = get_total_active_items()
+        if total_active == 0:
+            bot.send_message(
+                chat_id,
+                "Пока вообще нет активных объявлений 😕\nДобавь первое через ➕ Добавить",
+                reply_markup=main_menu()
+            )
+        else:
+            bot.send_message(
+                chat_id,
+                "По текущим фильтрам объявлений нет 😕\nПопробуй ♻️ Сбросить фильтры",
+                reply_markup=main_menu()
+            )
         return
 
     item_id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at = item
@@ -598,6 +631,12 @@ def show_item(chat_id: int, item, send_new: bool = True, edit_message_id: int | 
             )
 
 
+def get_total_active_items() -> int:
+    cursor.execute("SELECT COUNT(*) FROM items WHERE is_taken = 0")
+    row = cursor.fetchone()
+    return row[0] if row else 0
+
+
 # =========================
 # COMMANDS
 # =========================
@@ -614,7 +653,7 @@ def start_cmd(message):
             pass
 
     get_user_id(chat_id)
-    ensure_filters(chat_id)
+    reset_user_filters(chat_id)
     user_index[chat_id] = 0
 
     bot.send_message(chat_id, "Главное меню:", reply_markup=main_menu())
@@ -792,7 +831,8 @@ def menu_favorites(message):
 
 @bot.message_handler(func=lambda m: m.text == "⚙️ Фильтры")
 def menu_filters(message):
-    bot.send_message(message.chat.id, "Меню фильтров:", reply_markup=filters_menu())
+    ensure_filters(message.chat.id)
+    show_filters_menu(message.chat.id)
 
 
 @bot.message_handler(func=lambda m: m.text == "🏠 Меню")
@@ -864,7 +904,7 @@ def submenu_help(message):
         "1. Размещай реальные вещи\n"
         "2. Не публикуй запрещённые товары\n"
         "3. Будь вежлив с другими пользователями\n"
-        "4. Если вещь уже забрали — владелец удаляет или отмечает статус\n\n"
+        "4. Если вещь уже неактуальна — удали её\n\n"
         "Команды:\n"
         "/add Название;Цена;Город;Категория\n"
         "/addphoto Название;Цена;Город;Категория"
@@ -928,7 +968,7 @@ def set_city_filter(message):
     ensure_filters(message.chat.id)
     user_filters[message.chat.id]["city"] = None if message.text == "🌍 Любой город" else message.text
     user_index[message.chat.id] = 0
-    bot.send_message(message.chat.id, "Фильтр по городу обновлён", reply_markup=main_menu())
+    show_filters_menu(message.chat.id, "Фильтр по городу обновлён")
 
 
 @bot.message_handler(func=lambda m: m.text in CATEGORIES or m.text == "🌍 Любая категория")
@@ -936,7 +976,7 @@ def set_category_filter(message):
     ensure_filters(message.chat.id)
     user_filters[message.chat.id]["category"] = None if message.text == "🌍 Любая категория" else message.text
     user_index[message.chat.id] = 0
-    bot.send_message(message.chat.id, "Фильтр по категории обновлён", reply_markup=main_menu())
+    show_filters_menu(message.chat.id, "Фильтр по категории обновлён")
 
 
 @bot.message_handler(func=lambda m: m.text in ["🟢 Бесплатно", "🟡 До 400 ₽", "⚪ Любая цена"])
@@ -951,19 +991,26 @@ def set_price_filter(message):
         user_filters[message.chat.id]["price"] = "any"
 
     user_index[message.chat.id] = 0
-    bot.send_message(message.chat.id, "Фильтр по цене обновлён", reply_markup=main_menu())
+    show_filters_menu(message.chat.id, "Фильтр по цене обновлён")
 
 
 @bot.message_handler(func=lambda m: m.text == "♻️ Сбросить фильтры")
-def reset_filters(message):
-    ensure_filters(message.chat.id)
-    user_filters[message.chat.id] = {
-        "city": None,
-        "category": None,
-        "price": "any"
-    }
+def reset_filters_handler(message):
+    reset_user_filters(message.chat.id)
     user_index[message.chat.id] = 0
-    bot.send_message(message.chat.id, "Все фильтры сброшены ♻️", reply_markup=main_menu())
+    show_filters_menu(message.chat.id, "Все фильтры сброшены ♻️")
+
+
+@bot.message_handler(func=lambda m: m.text == "🔎 Показать")
+def show_filtered_items_handler(message):
+    user_index[message.chat.id] = 0
+    item = get_item_by_index(message.chat.id, 0)
+    show_item(message.chat.id, item)
+
+
+@bot.message_handler(func=lambda m: m.text == "⬅️ К фильтрам")
+def back_to_filters(message):
+    show_filters_menu(message.chat.id)
 
 
 # =========================
