@@ -1,8 +1,9 @@
 import os
 import time
 import sqlite3
-import telebot
+from typing import Optional, List, Tuple
 
+import telebot
 from telebot import types
 from telebot.apihelper import ApiTelegramException
 
@@ -11,7 +12,6 @@ if not TOKEN:
     raise ValueError("TOKEN не найден в переменных окружения")
 
 DB_PATH = os.getenv("DB_PATH", "darom.db")
-
 bot = telebot.TeleBot(TOKEN)
 
 # =========================
@@ -32,14 +32,15 @@ CREATE TABLE IF NOT EXISTS items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     price INTEGER NOT NULL DEFAULT 0,
-    city TEXT NOT NULL,
+    city TEXT NOT NULL DEFAULT '',
     category TEXT NOT NULL DEFAULT 'Без категории',
     photo_id TEXT,
     owner_tg INTEGER NOT NULL,
     views INTEGER NOT NULL DEFAULT 0,
     is_taken INTEGER NOT NULL DEFAULT 0,
     bump_count INTEGER NOT NULL DEFAULT 0,
-    last_bump_at INTEGER NOT NULL DEFAULT 0
+    last_bump_at INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL DEFAULT 0
 )
 """)
 
@@ -72,27 +73,42 @@ CREATE TABLE IF NOT EXISTS referrals (
 
 conn.commit()
 
+# migration for old DBs
+def ensure_column(table: str, column: str, ddl: str):
+    cursor.execute(f"PRAGMA table_info({table})")
+    cols = [row[1] for row in cursor.fetchall()]
+    if column not in cols:
+        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {ddl}")
+        conn.commit()
+
+ensure_column("items", "views", "views INTEGER NOT NULL DEFAULT 0")
+ensure_column("items", "is_taken", "is_taken INTEGER NOT NULL DEFAULT 0")
+ensure_column("items", "bump_count", "bump_count INTEGER NOT NULL DEFAULT 0")
+ensure_column("items", "last_bump_at", "last_bump_at INTEGER NOT NULL DEFAULT 0")
+ensure_column("items", "created_at", "created_at INTEGER NOT NULL DEFAULT 0")
+ensure_column("items", "category", "category TEXT NOT NULL DEFAULT 'Без категории'")
+ensure_column("items", "photo_id", "photo_id TEXT")
+
 # =========================
 # MEMORY
 # =========================
-user_index = {}
-pending_addphoto = {}
-pending_search = set()
-user_filters = {}
+user_index = {}          # chat_id -> current index in filtered items
+pending_addphoto = {}    # chat_id -> dict
+pending_search = set()   # chat_id
+user_filters = {}        # chat_id -> dict(city/category/price)
+pending_edit = {}        # chat_id -> item_id
 
 # =========================
 # CONSTANTS
 # =========================
 POPULAR_CITIES = ["Москва", "СПб", "Казань", "Екатеринбург"]
 CATEGORIES = ["Одежда", "Обувь", "Техника", "Дом", "Детское", "Другое"]
-
-# Поднимать можно раз в 12 часов
 BUMP_COOLDOWN_SECONDS = 12 * 60 * 60
 
 # =========================
 # HELPERS
 # =========================
-def get_now_ts() -> int:
+def now_ts() -> int:
     return int(time.time())
 
 
@@ -105,7 +121,7 @@ def ensure_filters(chat_id: int):
         }
 
 
-def reset_user_filters(chat_id: int):
+def reset_filters(chat_id: int):
     user_filters[chat_id] = {
         "city": None,
         "category": None,
@@ -128,17 +144,46 @@ def get_user_id(telegram_id: int) -> int:
     return row[0]
 
 
-def add_item(title: str, price: int, city: str, category: str, owner_tg: int, photo_id=None):
-    cursor.execute("""
-        INSERT INTO items (title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at)
-        VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0)
-    """, (title, price, city, category, photo_id, owner_tg))
+def add_referral(inviter_tg: int, invited_tg: int):
+    if inviter_tg == invited_tg:
+        return
+    cursor.execute(
+        "INSERT OR IGNORE INTO referrals (inviter_tg, invited_tg) VALUES (?, ?)",
+        (inviter_tg, invited_tg)
+    )
     conn.commit()
+
+
+def get_referrals_count(inviter_tg: int) -> int:
+    cursor.execute(
+        "SELECT COUNT(*) FROM referrals WHERE inviter_tg = ?",
+        (inviter_tg,)
+    )
+    row = cursor.fetchone()
+    return row[0] if row else 0
+
+
+def add_item(title: str, price: int, city: str, category: str, owner_tg: int, photo_id: Optional[str] = None):
+    cursor.execute("""
+        INSERT INTO items (title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, ?)
+    """, (title, price, city, category, photo_id, owner_tg, now_ts()))
+    conn.commit()
+
+
+def update_item(item_id: int, owner_tg: int, title: str, price: int, city: str, category: str) -> bool:
+    cursor.execute("""
+        UPDATE items
+        SET title = ?, price = ?, city = ?, category = ?
+        WHERE id = ? AND owner_tg = ?
+    """, (title, price, city, category, item_id, owner_tg))
+    conn.commit()
+    return cursor.rowcount > 0
 
 
 def get_item_by_id(item_id: int):
     cursor.execute("""
-        SELECT id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at
+        SELECT id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at, created_at
         FROM items
         WHERE id = ?
     """, (item_id,))
@@ -156,7 +201,7 @@ def get_filtered_items(chat_id: int):
     f = user_filters[chat_id]
 
     query = """
-        SELECT id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at
+        SELECT id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at, created_at
         FROM items
         WHERE is_taken = 0
     """
@@ -176,7 +221,6 @@ def get_filtered_items(chat_id: int):
         query += " AND price >= 0 AND price <= 400"
 
     query += " ORDER BY id DESC"
-
     cursor.execute(query, tuple(params))
     return cursor.fetchall()
 
@@ -190,7 +234,7 @@ def get_item_by_index(chat_id: int, idx: int):
 
 def get_user_items(owner_tg: int):
     cursor.execute("""
-        SELECT id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at
+        SELECT id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at, created_at
         FROM items
         WHERE owner_tg = ?
         ORDER BY id DESC
@@ -203,9 +247,16 @@ def delete_item(item_id: int, owner_tg: int) -> bool:
         "DELETE FROM items WHERE id = ? AND owner_tg = ?",
         (item_id, owner_tg)
     )
-    ok = cursor.rowcount > 0
     conn.commit()
-    return ok
+    return cursor.rowcount > 0
+
+
+def mark_taken(item_id: int):
+    cursor.execute(
+        "UPDATE items SET is_taken = 1 WHERE id = ?",
+        (item_id,)
+    )
+    conn.commit()
 
 
 def can_bump_item(item_id: int, owner_tg: int):
@@ -219,13 +270,11 @@ def can_bump_item(item_id: int, owner_tg: int):
     if not row:
         return False, 0
 
-    last_bump_at = row[0] or 0
-    now_ts = get_now_ts()
-
-    if last_bump_at == 0:
+    last_bump = row[0] or 0
+    if last_bump == 0:
         return True, 0
 
-    passed = now_ts - last_bump_at
+    passed = now_ts() - last_bump
     if passed >= BUMP_COOLDOWN_SECONDS:
         return True, 0
 
@@ -235,25 +284,26 @@ def can_bump_item(item_id: int, owner_tg: int):
 
 def bump_item(item_id: int, owner_tg: int):
     cursor.execute("""
-        SELECT title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count
+        SELECT title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, created_at
         FROM items
         WHERE id = ? AND owner_tg = ?
     """, (item_id, owner_tg))
     row = cursor.fetchone()
-
     if not row:
         return False
 
-    title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count = row
-    now_ts = get_now_ts()
+    title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, created_at = row
 
     cursor.execute("DELETE FROM items WHERE id = ?", (item_id,))
     conn.commit()
 
     cursor.execute("""
-        INSERT INTO items (title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count + 1, now_ts))
+        INSERT INTO items (title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        title, price, city, category, photo_id, owner_tg,
+        views, is_taken, bump_count + 1, now_ts(), created_at
+    ))
     conn.commit()
     return True
 
@@ -267,7 +317,10 @@ def add_favorite(user_id: int, item_id: int):
 
 
 def get_favorites(user_id: int):
-    cursor.execute("SELECT item_id FROM favorites WHERE user_id = ?", (user_id,))
+    cursor.execute(
+        "SELECT item_id FROM favorites WHERE user_id = ?",
+        (user_id,)
+    )
     rows = cursor.fetchall()
     return [r[0] for r in rows]
 
@@ -297,7 +350,10 @@ def has_like(user_id: int, item_id: int) -> bool:
 
 
 def get_likes_count(item_id: int) -> int:
-    cursor.execute("SELECT COUNT(*) FROM likes WHERE item_id = ?", (item_id,))
+    cursor.execute(
+        "SELECT COUNT(*) FROM likes WHERE item_id = ?",
+        (item_id,)
+    )
     row = cursor.fetchone()
     return row[0] if row else 0
 
@@ -310,28 +366,12 @@ def add_view(item_id: int):
     conn.commit()
 
 
-def add_referral(inviter_tg: int, invited_tg: int):
-    if inviter_tg == invited_tg:
-        return
-    cursor.execute(
-        "INSERT OR IGNORE INTO referrals (inviter_tg, invited_tg) VALUES (?, ?)",
-        (inviter_tg, invited_tg)
-    )
-    conn.commit()
-
-
-def get_referrals_count(inviter_tg: int) -> int:
-    cursor.execute("SELECT COUNT(*) FROM referrals WHERE inviter_tg = ?", (inviter_tg,))
-    row = cursor.fetchone()
-    return row[0] if row else 0
-
-
 def search_items(chat_id: int, query_text: str):
     ensure_filters(chat_id)
     f = user_filters[chat_id]
 
     query = """
-        SELECT id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at
+        SELECT id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at, created_at
         FROM items
         WHERE is_taken = 0
           AND LOWER(title) LIKE ?
@@ -352,15 +392,14 @@ def search_items(chat_id: int, query_text: str):
         query += " AND price >= 0 AND price <= 400"
 
     query += " ORDER BY id DESC"
-
     cursor.execute(query, tuple(params))
     return cursor.fetchall()
 
 
 def get_popular_items(limit: int = 10):
     cursor.execute("""
-        SELECT i.id, i.title, i.price, i.city, i.category, i.photo_id, i.owner_tg, i.views, i.is_taken, i.bump_count, i.last_bump_at,
-               COUNT(l.id) as likes_count
+        SELECT i.id, i.title, i.price, i.city, i.category, i.photo_id, i.owner_tg, i.views, i.is_taken, i.bump_count, i.last_bump_at, i.created_at,
+               COUNT(l.id) AS likes_count
         FROM items i
         LEFT JOIN likes l ON i.id = l.item_id
         WHERE i.is_taken = 0
@@ -402,9 +441,27 @@ def filters_status_text(chat_id: int) -> str:
 
 
 def short_item_label(item):
-    item_id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at = item
+    item_id, title, price, city, category, *_ = item
     price_text = "Бесплатно" if price == 0 else f"{price} ₽"
     return f"#{item_id} {title} | {price_text} | {city}"
+
+
+def parse_edit_text(text: str):
+    parts = [p.strip() for p in text.split(";")]
+    if len(parts) < 4:
+        return None
+
+    title, price_raw, city, category = parts[0], parts[1], parts[2], parts[3]
+
+    try:
+        price = int(price_raw)
+    except ValueError:
+        return None
+
+    if len(title) < 2 or len(city) < 1 or len(category) < 1:
+        return None
+
+    return title, price, city, category
 
 
 # =========================
@@ -412,97 +469,58 @@ def short_item_label(item):
 # =========================
 def main_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.row(
-        types.KeyboardButton("🔎 Смотреть"),
-        types.KeyboardButton("➕ Добавить")
-    )
-    kb.row(
-        types.KeyboardButton("⚙️ Фильтры"),
-        types.KeyboardButton("❤️ Избранное")
-    )
-    kb.row(types.KeyboardButton("🏠 Меню"))
+    kb.row("🔎 Смотреть", "➕ Добавить")
+    kb.row("⚙️ Фильтры", "❤️ Избранное")
+    kb.row("🏠 Меню")
     return kb
 
 
 def submenu_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.row(
-        types.KeyboardButton("📦 Мои объявления"),
-        types.KeyboardButton("📊 Статистика")
-    )
-    kb.row(
-        types.KeyboardButton("🎁 Пригласить"),
-        types.KeyboardButton("🆘 Помощь / правила")
-    )
-    kb.row(
-        types.KeyboardButton("🔥 Популярное"),
-        types.KeyboardButton("🔍 Поиск")
-    )
-    kb.row(types.KeyboardButton("⬅️ Назад"))
+    kb.row("📦 Мои объявления", "📊 Статистика")
+    kb.row("🎁 Пригласить", "🆘 Помощь / правила")
+    kb.row("🔥 Популярное", "🔍 Поиск")
+    kb.row("⬅️ Назад")
     return kb
 
 
 def filters_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.row(
-        types.KeyboardButton("📍 Город"),
-        types.KeyboardButton("📦 Категория")
-    )
-    kb.row(
-        types.KeyboardButton("💰 Цена"),
-        types.KeyboardButton("🔎 Показать")
-    )
-    kb.row(types.KeyboardButton("♻️ Сбросить фильтры"))
-    kb.row(types.KeyboardButton("⬅️ Назад"))
+    kb.row("📍 Город", "📦 Категория")
+    kb.row("💰 Цена", "🔎 Показать")
+    kb.row("♻️ Сбросить фильтры")
+    kb.row("⬅️ Назад")
     return kb
 
 
 def city_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.row(
-        types.KeyboardButton("Москва"),
-        types.KeyboardButton("СПб")
-    )
-    kb.row(
-        types.KeyboardButton("Казань"),
-        types.KeyboardButton("Екатеринбург")
-    )
-    kb.row(types.KeyboardButton("🌍 Любой город"))
-    kb.row(types.KeyboardButton("⬅️ К фильтрам"))
+    kb.row("Москва", "СПб")
+    kb.row("Казань", "Екатеринбург")
+    kb.row("🌍 Любой город")
+    kb.row("⬅️ К фильтрам")
     return kb
 
 
 def category_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.row(
-        types.KeyboardButton("Одежда"),
-        types.KeyboardButton("Обувь")
-    )
-    kb.row(
-        types.KeyboardButton("Техника"),
-        types.KeyboardButton("Дом")
-    )
-    kb.row(
-        types.KeyboardButton("Детское"),
-        types.KeyboardButton("Другое")
-    )
-    kb.row(types.KeyboardButton("🌍 Любая категория"))
-    kb.row(types.KeyboardButton("⬅️ К фильтрам"))
+    kb.row("Одежда", "Обувь")
+    kb.row("Техника", "Дом")
+    kb.row("Детское", "Другое")
+    kb.row("🌍 Любая категория")
+    kb.row("⬅️ К фильтрам")
     return kb
 
 
 def price_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.row(
-        types.KeyboardButton("🟢 Бесплатно"),
-        types.KeyboardButton("🟡 До 400 ₽")
-    )
-    kb.row(types.KeyboardButton("⚪ Любая цена"))
-    kb.row(types.KeyboardButton("⬅️ К фильтрам"))
+    kb.row("🟢 Бесплатно", "🟡 До 400 ₽")
+    kb.row("⚪ Любая цена")
+    kb.row("⬅️ К фильтрам")
     return kb
 
 
-def show_filters_menu(chat_id: int, notice: str | None = None):
+def show_filters_menu(chat_id: int, notice: Optional[str] = None):
     text = filters_status_text(chat_id)
     if notice:
         text = f"{notice}\n\n{text}"
@@ -512,7 +530,6 @@ def show_filters_menu(chat_id: int, notice: str | None = None):
 def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
     viewer_user_id = get_user_id(viewer_tg)
     likes_count = get_likes_count(item_id)
-
     like_text = f"💔 Убрать лайк ({likes_count})" if has_like(viewer_user_id, item_id) else f"❤️ Лайк ({likes_count})"
 
     kb = types.InlineKeyboardMarkup()
@@ -530,16 +547,17 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
             types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}"),
             types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
         )
-    else:
         kb.row(
-            types.InlineKeyboardButton("✅ Забрать", callback_data="take")
+            types.InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{item_id}")
         )
+    else:
+        kb.row(types.InlineKeyboardButton("✅ Забрать", callback_data="take"))
 
     return kb
 
 
-def format_item_text(item) -> str:
-    item_id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at = item
+def format_item_text(item):
+    item_id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at, created_at = item
     likes_count = get_likes_count(item_id)
 
     text = f"🧥 {title}\n"
@@ -555,7 +573,7 @@ def format_item_text(item) -> str:
     return text
 
 
-def show_item(chat_id: int, item, send_new: bool = True, edit_message_id: int | None = None, count_view: bool = True):
+def show_item(chat_id: int, item, send_new: bool = True, edit_message_id: Optional[int] = None, count_view: bool = True):
     if not item:
         total_active = get_total_active_items()
         if total_active == 0:
@@ -572,13 +590,12 @@ def show_item(chat_id: int, item, send_new: bool = True, edit_message_id: int | 
             )
         return
 
-    item_id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at = item
+    item_id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at, created_at = item
 
     if count_view:
         add_view(item_id)
 
     fresh_item = get_item_by_id(item_id)
-
     if not fresh_item or fresh_item[8] == 1:
         bot.send_message(chat_id, "Объявление уже недоступно", reply_markup=main_menu())
         return
@@ -625,10 +642,9 @@ def show_my_item(chat_id: int, item_id: int):
 
 def build_my_items_keyboard(owner_tg: int):
     items = get_user_items(owner_tg)
-    kb = types.InlineKeyboardMarkup()
-
     active_items = [item for item in items if item[8] == 0]
 
+    kb = types.InlineKeyboardMarkup()
     for item in active_items[:20]:
         kb.row(
             types.InlineKeyboardButton(
@@ -636,7 +652,6 @@ def build_my_items_keyboard(owner_tg: int):
                 callback_data=f"myitem_{item[0]}"
             )
         )
-
     return kb
 
 
@@ -656,7 +671,7 @@ def start_cmd(message):
             pass
 
     get_user_id(chat_id)
-    reset_user_filters(chat_id)
+    reset_filters(chat_id)
     user_index[chat_id] = 0
 
     bot.send_message(chat_id, "Главное меню:", reply_markup=main_menu())
@@ -668,29 +683,16 @@ def start_cmd(message):
 def add_cmd(message):
     chat_id = message.chat.id
     raw = message.text.replace('/add', '', 1).strip()
-    parts = [p.strip() for p in raw.split(';')]
+    parsed = parse_edit_text(raw)
 
-    if len(parts) < 4:
+    if not parsed:
         bot.send_message(
             chat_id,
             "❌ Формат:\n/add Название;Цена;Город;Категория\n\nПример:\n/add Куртка;0;Москва;Одежда"
         )
         return
 
-    title = parts[0]
-    city = parts[2]
-    category = parts[3]
-
-    try:
-        price = int(parts[1])
-    except ValueError:
-        bot.send_message(chat_id, "❌ Цена должна быть числом")
-        return
-
-    if len(title) < 2:
-        bot.send_message(chat_id, "❌ Слишком короткое название")
-        return
-
+    title, price, city, category = parsed
     add_item(title, price, city, category, chat_id)
 
     bot.send_message(
@@ -707,25 +709,16 @@ def add_cmd(message):
 def addphoto_cmd(message):
     chat_id = message.chat.id
     raw = message.text.replace('/addphoto', '', 1).strip()
-    parts = [p.strip() for p in raw.split(';')]
+    parsed = parse_edit_text(raw)
 
-    if len(parts) < 4:
+    if not parsed:
         bot.send_message(
             chat_id,
             "❌ Формат:\n/addphoto Название;Цена;Город;Категория\n\nПример:\n/addphoto Поло;0;Москва;Одежда"
         )
         return
 
-    title = parts[0]
-    city = parts[2]
-    category = parts[3]
-
-    try:
-        price = int(parts[1])
-    except ValueError:
-        bot.send_message(chat_id, "❌ Цена должна быть числом")
-        return
-
+    title, price, city, category = parsed
     pending_addphoto[chat_id] = {
         "title": title,
         "price": price,
@@ -771,6 +764,33 @@ def photo_handler(message):
 
 
 # =========================
+# EDIT TEXT
+# =========================
+@bot.message_handler(func=lambda m: m.chat.id in pending_edit)
+def handle_edit_text(message):
+    chat_id = message.chat.id
+    item_id = pending_edit.pop(chat_id)
+
+    parsed = parse_edit_text(message.text.strip())
+    if not parsed:
+        bot.send_message(
+            chat_id,
+            "❌ Ошибка формата.\nОтправь так:\nНазвание;Цена;Город;Категория\n\nПример:\nКуртка зимняя;0;Москва;Одежда"
+        )
+        return
+
+    title, price, city, category = parsed
+    ok = update_item(item_id, chat_id, title, price, city, category)
+
+    if not ok:
+        bot.send_message(chat_id, "Не удалось обновить объявление")
+        return
+
+    bot.send_message(chat_id, "✅ Объявление обновлено")
+    show_my_item(chat_id, item_id)
+
+
+# =========================
 # MAIN MENU
 # =========================
 @bot.message_handler(func=lambda m: m.text == "🔎 Смотреть")
@@ -806,7 +826,7 @@ def menu_favorites(message):
 
     placeholders = ",".join(["?"] * len(fav_ids))
     cursor.execute(f"""
-        SELECT id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at
+        SELECT id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at, created_at
         FROM items
         WHERE id IN ({placeholders}) AND is_taken = 0
         ORDER BY id DESC
@@ -819,7 +839,7 @@ def menu_favorites(message):
 
     text = "❤️ Избранное:\n\n"
     for item in rows[:20]:
-        item_id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at = item
+        item_id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at, created_at = item
         text += f"#{item_id} — {title} | "
         text += "Бесплатно" if price == 0 else f"{price} ₽"
         text += f" | {city} | {category} | ❤️ {get_likes_count(item_id)} | 👁 {views}\n"
@@ -851,10 +871,8 @@ def submenu_my_items(message):
         bot.send_message(chat_id, "У тебя пока нет активных объявлений", reply_markup=submenu_menu())
         return
 
-    text = "📦 Выбери своё объявление:"
-    kb = build_my_items_keyboard(chat_id)
-    bot.send_message(chat_id, text, reply_markup=submenu_menu())
-    bot.send_message(chat_id, "Список:", reply_markup=kb)
+    bot.send_message(chat_id, "📦 Выбери своё объявление:", reply_markup=submenu_menu())
+    bot.send_message(chat_id, "Список:", reply_markup=build_my_items_keyboard(chat_id))
 
 
 @bot.message_handler(func=lambda m: m.text == "📊 Статистика")
@@ -916,7 +934,7 @@ def submenu_popular(message):
 
     text = "🔥 Популярное:\n\n"
     for row in rows:
-        item_id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at, likes_count = row
+        item_id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at, created_at, likes_count = row
         text += f"#{item_id} — {title} | "
         text += "Бесплатно" if price == 0 else f"{price} ₽"
         text += f" | {city} | {category} | ❤️ {likes_count} | 👁 {views}\n"
@@ -976,7 +994,6 @@ def set_category_filter(message):
 @bot.message_handler(func=lambda m: m.text in ["🟢 Бесплатно", "🟡 До 400 ₽", "⚪ Любая цена"])
 def set_price_filter(message):
     ensure_filters(message.chat.id)
-
     if message.text == "🟢 Бесплатно":
         user_filters[message.chat.id]["price"] = "free"
     elif message.text == "🟡 До 400 ₽":
@@ -990,7 +1007,7 @@ def set_price_filter(message):
 
 @bot.message_handler(func=lambda m: m.text == "♻️ Сбросить фильтры")
 def reset_filters_handler(message):
-    reset_user_filters(message.chat.id)
+    reset_filters(message.chat.id)
     user_index[message.chat.id] = 0
     show_filters_menu(message.chat.id, "Все фильтры сброшены ♻️")
 
@@ -1041,14 +1058,13 @@ def handle_search_text(message):
         return
 
     rows = search_items(chat_id, query_text)
-
     if not rows:
         bot.send_message(chat_id, f"По запросу «{query_text}» ничего не найдено", reply_markup=submenu_menu())
         return
 
     text = f"🔍 Результаты поиска: {query_text}\n\n"
     for item in rows[:20]:
-        item_id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at = item
+        item_id, title, price, city, category, photo_id, owner_tg, views, is_taken, bump_count, last_bump_at, created_at = item
         text += f"#{item_id} — {title} | "
         text += "Бесплатно" if price == 0 else f"{price} ₽"
         text += f" | {city} | {category} | ❤️ {get_likes_count(item_id)} | 👁 {views}\n"
@@ -1145,7 +1161,7 @@ def callback_handler(call):
 
         item = get_item_by_id(item_id)
         if not item:
-            bot.answer_callback_query(call.id, "Уже удалено")
+            bot.answer_callback_query(call.id, "Объявление не найдено")
             return
 
         if item[6] != chat_id:
@@ -1192,7 +1208,6 @@ def callback_handler(call):
             except Exception:
                 pass
 
-            # Покажем уже новое, поднятое объявление владельцу
             new_items = get_user_items(chat_id)
             active_items = [x for x in new_items if x[8] == 0]
             if active_items:
@@ -1210,6 +1225,33 @@ def callback_handler(call):
 
         bot.answer_callback_query(call.id)
         show_my_item(chat_id, item_id)
+        return
+
+    if data.startswith("edit_"):
+        try:
+            item_id = int(data.split("_", 1)[1])
+        except ValueError:
+            bot.answer_callback_query(call.id, "Ошибка")
+            return
+
+        item = get_item_by_id(item_id)
+        if not item:
+            bot.answer_callback_query(call.id, "Объявление не найдено")
+            return
+
+        if item[6] != chat_id:
+            bot.answer_callback_query(call.id, "Это не твоё объявление")
+            return
+
+        pending_edit[chat_id] = item_id
+        bot.answer_callback_query(call.id, "Отправь новые данные")
+        bot.send_message(
+            chat_id,
+            "✏️ Отправь новые данные в формате:\n\n"
+            "Название;Цена;Город;Категория\n\n"
+            "Пример:\n"
+            "Куртка зимняя;0;Москва;Одежда"
+        )
         return
 
 
