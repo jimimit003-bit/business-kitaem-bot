@@ -98,6 +98,7 @@ pending_addphoto = {}
 pending_search = set()
 user_filters = {}
 pending_edit = {}
+pending_create = {}   # chat_id -> {"step": "...", "data": {...}}
 
 # =========================
 # CONSTANTS
@@ -498,6 +499,81 @@ def parse_edit_text(text: str):
 
 
 # =========================
+# STEP-BY-STEP CREATE
+# =========================
+def cancel_kb():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.row("❌ Отмена")
+    return kb
+
+
+def category_pick_kb():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.row("Одежда", "Обувь")
+    kb.row("Техника", "Дом")
+    kb.row("Детское", "Другое")
+    kb.row("❌ Отмена")
+    return kb
+
+
+def photo_step_kb():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.row("⏭️ Без фото")
+    kb.row("❌ Отмена")
+    return kb
+
+
+def start_create_flow(chat_id: int):
+    pending_create[chat_id] = {
+        "step": "title",
+        "data": {}
+    }
+    bot.send_message(
+        chat_id,
+        "➕ Добавление объявления\n\nНапиши название вещи:",
+        reply_markup=cancel_kb()
+    )
+
+
+def create_preview_text(data: dict) -> str:
+    price = data.get("price", 0)
+    text = f"✅ Объявление создано:\n\n"
+    text += f"🧥 {data.get('title', '')}\n"
+    text += "🟢 Бесплатно\n" if price == 0 else f"💰 {price} ₽\n"
+    text += f"📍 {data.get('city', '')}\n"
+    text += f"📦 {data.get('category', '')}"
+    return text
+
+
+def finish_create_without_photo(chat_id: int):
+    data = pending_create[chat_id]["data"]
+    add_item(
+        title=data["title"],
+        price=data["price"],
+        city=data["city"],
+        category=data["category"],
+        owner_tg=chat_id,
+        photo_id=None
+    )
+    pending_create.pop(chat_id, None)
+    bot.send_message(chat_id, create_preview_text(data), reply_markup=main_menu())
+
+
+def finish_create_with_photo(chat_id: int, photo_id: str):
+    data = pending_create[chat_id]["data"]
+    add_item(
+        title=data["title"],
+        price=data["price"],
+        city=data["city"],
+        category=data["category"],
+        owner_tg=chat_id,
+        photo_id=photo_id
+    )
+    pending_create.pop(chat_id, None)
+    bot.send_message(chat_id, create_preview_text(data), reply_markup=main_menu())
+
+
+# =========================
 # UI
 # =========================
 def main_menu():
@@ -821,31 +897,38 @@ def addphoto_cmd(message):
 def photo_handler(message):
     chat_id = message.chat.id
 
-    if chat_id not in pending_addphoto:
-        bot.send_message(chat_id, "Фото получено, но активного /addphoto сейчас нет")
+    # Пошаговое добавление
+    if chat_id in pending_create and pending_create[chat_id]["step"] == "photo":
+        photo_id = message.photo[-1].file_id
+        finish_create_with_photo(chat_id, photo_id)
         return
 
-    draft = pending_addphoto.pop(chat_id)
-    photo_id = message.photo[-1].file_id
+    # Команда /addphoto
+    if chat_id in pending_addphoto:
+        draft = pending_addphoto.pop(chat_id)
+        photo_id = message.photo[-1].file_id
 
-    add_item(
-        title=draft["title"],
-        price=draft["price"],
-        city=draft["city"],
-        category=draft["category"],
-        owner_tg=chat_id,
-        photo_id=photo_id
-    )
+        add_item(
+            title=draft["title"],
+            price=draft["price"],
+            city=draft["city"],
+            category=draft["category"],
+            owner_tg=chat_id,
+            photo_id=photo_id
+        )
 
-    bot.send_message(
-        chat_id,
-        f"✅ Объявление с фото добавлено:\n"
-        f"🧥 {draft['title']}\n"
-        + ("🟢 Бесплатно\n" if draft["price"] == 0 else f"💰 {draft['price']} ₽\n")
-        + f"📍 {draft['city']}\n"
-        + f"📦 {draft['category']}",
-        reply_markup=main_menu()
-    )
+        bot.send_message(
+            chat_id,
+            f"✅ Объявление с фото добавлено:\n"
+            f"🧥 {draft['title']}\n"
+            + ("🟢 Бесплатно\n" if draft["price"] == 0 else f"💰 {draft['price']} ₽\n")
+            + f"📍 {draft['city']}\n"
+            + f"📦 {draft['category']}",
+            reply_markup=main_menu()
+        )
+        return
+
+    bot.send_message(chat_id, "Фото получено, но сейчас бот не ждёт фото")
 
 
 # =========================
@@ -877,6 +960,90 @@ def handle_edit_text(message):
 
 
 # =========================
+# STEP CREATE
+# =========================
+@bot.message_handler(func=lambda m: m.text == "❌ Отмена" and m.chat.id in pending_create)
+def cancel_create(message):
+    pending_create.pop(message.chat.id, None)
+    bot.send_message(message.chat.id, "Создание объявления отменено", reply_markup=main_menu())
+
+
+@bot.message_handler(func=lambda m: m.chat.id in pending_create and pending_create[m.chat.id]["step"] == "title")
+def create_title_handler(message):
+    text = (message.text or "").strip()
+    if len(text) < 2:
+        bot.send_message(message.chat.id, "Название слишком короткое. Напиши нормальное название вещи.")
+        return
+
+    pending_create[message.chat.id]["data"]["title"] = text
+    pending_create[message.chat.id]["step"] = "price"
+    bot.send_message(
+        message.chat.id,
+        "💰 Укажи цену.\nЕсли бесплатно — напиши 0",
+        reply_markup=cancel_kb()
+    )
+
+
+@bot.message_handler(func=lambda m: m.chat.id in pending_create and pending_create[m.chat.id]["step"] == "price")
+def create_price_handler(message):
+    text = (message.text or "").strip()
+
+    try:
+        price = int(text)
+        if price < 0:
+            raise ValueError
+    except ValueError:
+        bot.send_message(message.chat.id, "Цена должна быть числом. Если бесплатно — напиши 0.")
+        return
+
+    pending_create[message.chat.id]["data"]["price"] = price
+    pending_create[message.chat.id]["step"] = "city"
+    bot.send_message(
+        message.chat.id,
+        "📍 Напиши город",
+        reply_markup=cancel_kb()
+    )
+
+
+@bot.message_handler(func=lambda m: m.chat.id in pending_create and pending_create[m.chat.id]["step"] == "city")
+def create_city_handler(message):
+    text = (message.text or "").strip()
+    if len(text) < 1:
+        bot.send_message(message.chat.id, "Напиши город.")
+        return
+
+    pending_create[message.chat.id]["data"]["city"] = text
+    pending_create[message.chat.id]["step"] = "category"
+    bot.send_message(
+        message.chat.id,
+        "📦 Выбери категорию",
+        reply_markup=category_pick_kb()
+    )
+
+
+@bot.message_handler(func=lambda m: m.chat.id in pending_create and pending_create[m.chat.id]["step"] == "category")
+def create_category_handler(message):
+    text = (message.text or "").strip()
+
+    if text not in CATEGORIES:
+        bot.send_message(message.chat.id, "Выбери категорию кнопкой ниже.")
+        return
+
+    pending_create[message.chat.id]["data"]["category"] = text
+    pending_create[message.chat.id]["step"] = "photo"
+    bot.send_message(
+        message.chat.id,
+        "🖼 Теперь отправь фото товара.\nИли нажми «⏭️ Без фото»",
+        reply_markup=photo_step_kb()
+    )
+
+
+@bot.message_handler(func=lambda m: m.chat.id in pending_create and pending_create[m.chat.id]["step"] == "photo" and m.text == "⏭️ Без фото")
+def create_skip_photo_handler(message):
+    finish_create_without_photo(message.chat.id)
+
+
+# =========================
 # MAIN MENU
 # =========================
 @bot.message_handler(func=lambda m: m.text == "🔎 Смотреть")
@@ -889,15 +1056,7 @@ def menu_watch(message):
 
 @bot.message_handler(func=lambda m: m.text == "➕ Добавить")
 def menu_add(message):
-    bot.send_message(
-        message.chat.id,
-        "Команды:\n\n"
-        "/add Название;Цена;Город;Категория\n"
-        "/addphoto Название;Цена;Город;Категория\n\n"
-        "Примеры:\n"
-        "/add Куртка;0;Москва;Одежда\n"
-        "/addphoto Поло;0;Москва;Одежда"
-    )
+    start_create_flow(message.chat.id)
 
 
 @bot.message_handler(func=lambda m: m.text == "❤️ Избранное")
@@ -1014,8 +1173,9 @@ def submenu_help(message):
         "1. Размещай реальные вещи\n"
         "2. Не публикуй запрещённые товары\n"
         "3. Будь вежлив с другими пользователями\n"
-        "4. Если вещь уже отдана — нажми ✅ Отдано\n\n"
-        "Команды:\n"
+        "4. Если вещь уже отдана — нажми ✅ Отдано\n"
+        "5. Чтобы добавить объявление — просто нажми ➕ Добавить\n\n"
+        "Запасные команды:\n"
         "/add Название;Цена;Город;Категория\n"
         "/addphoto Название;Цена;Город;Категория"
     )
