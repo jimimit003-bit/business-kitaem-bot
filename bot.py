@@ -948,6 +948,9 @@ def show_filtered(message):
     
 @bot.message_handler(func=lambda m: m.text in POPULAR_CITIES or m.text == "🌍 Любой город")
 def set_city_filter(message):
+
+    if message.chat.id in pending_create:
+        return
     ensure_filters(message.chat.id)
     user_filters[message.chat.id]["city"] = None if message.text == "🌍 Любой город" else message.text
     show_filters_menu(message.chat.id, "📍 Фильтр по городу обновлён")
@@ -955,6 +958,9 @@ def set_city_filter(message):
 
 @bot.message_handler(func=lambda m: m.text in CATEGORIES or m.text == "🌍 Любая категория")
 def set_category_filter(message):
+
+    if message.chat.id in pending_create:
+        return
     ensure_filters(message.chat.id)
     user_filters[message.chat.id]["category"] = None if message.text == "🌍 Любая категория" else message.text
     show_filters_menu(message.chat.id, "📦 Фильтр по категории обновлён")
@@ -962,6 +968,9 @@ def set_category_filter(message):
 
 @bot.message_handler(func=lambda m: m.text in ["🟢 Бесплатно", "🟡 До 400 ₽", "⚪ Любая цена"])
 def set_price_filter(message):
+
+    if message.chat.id in pending_create:
+        return
     ensure_filters(message.chat.id)
 
     if message.text == "🟢 Бесплатно":
