@@ -1180,11 +1180,8 @@ def set_city_filter(message):
     show_filters_menu(message.chat.id, "📍 Фильтр по городу обновлён")
 
 
-@bot.message_handler(func=lambda m: m.text in CATEGORIES or m.text == "🌍 Любая категория")
+@bot.message_handler(func=lambda m: (m.text in CATEGORIES or m.text == "🌍 Любая категория") and m.chat.id not in pending_create)
 def set_category_filter(message):
-    if message.chat.id in pending_create:
-        return
-
     ensure_filters(message.chat.id)
     user_filters[message.chat.id]["category"] = None if message.text == "🌍 Любая категория" else message.text
     show_filters_menu(message.chat.id, "📦 Фильтр по категории обновлён")
