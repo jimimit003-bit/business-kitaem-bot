@@ -12,7 +12,7 @@ if not TOKEN:
     raise ValueError("TOKEN не найден в переменных окружения")
 
 DB_PATH = os.getenv("DB_PATH", "darom.db")
-bot = telebot.TeleBot(TOKEN, parse_mode=None)
+bot = telebot.TeleBot(TOKEN)
 
 # =========================
 # DB
@@ -95,13 +95,13 @@ conn.commit()
 # =========================
 # MEMORY
 # =========================
-user_index = {}                # chat_id -> idx in filtered items
-pending_search = set()         # chat_id
-user_filters = {}              # chat_id -> filters dict
-pending_edit = {}              # chat_id -> item_id
-pending_create = {}            # chat_id -> flow dict
-pending_replace_photos = {}    # chat_id -> item_id
-view_state = {}                # chat_id -> {"item_id": int, "mode": str, "photo_idx": int}
+user_index = {}
+pending_search = set()
+user_filters = {}
+pending_edit = {}
+pending_create = {}
+pending_replace_photo = {}
+view_state = {}
 
 # =========================
 # CONSTANTS
@@ -110,7 +110,6 @@ POPULAR_CITIES = ["Москва", "СПб", "Казань", "Екатеринб�
 CATEGORIES = ["Одежда", "Обувь", "Техника", "Дом", "Детское", "Другое"]
 BUMP_COOLDOWN_SECONDS = 12 * 60 * 60
 MAX_PHOTOS_PER_ITEM = 5
-
 
 # =========================
 # HELPERS
@@ -137,9 +136,16 @@ def reset_filters(chat_id: int):
 
 
 def get_user_id(telegram_id: int) -> int:
-    cursor.execute("INSERT OR IGNORE INTO users (telegram_id) VALUES (?)", (telegram_id,))
+    cursor.execute(
+        "INSERT OR IGNORE INTO users (telegram_id) VALUES (?)",
+        (telegram_id,)
+    )
     conn.commit()
-    cursor.execute("SELECT id FROM users WHERE telegram_id = ?", (telegram_id,))
+
+    cursor.execute(
+        "SELECT id FROM users WHERE telegram_id = ?",
+        (telegram_id,)
+    )
     row = cursor.fetchone()
     return row[0]
 
@@ -155,7 +161,10 @@ def add_referral(inviter_tg: int, invited_tg: int):
 
 
 def get_referrals_count(inviter_tg: int) -> int:
-    cursor.execute("SELECT COUNT(*) FROM referrals WHERE inviter_tg = ?", (inviter_tg,))
+    cursor.execute(
+        "SELECT COUNT(*) FROM referrals WHERE inviter_tg = ?",
+        (inviter_tg,)
+    )
     row = cursor.fetchone()
     return row[0] if row else 0
 
@@ -626,7 +635,7 @@ def finish_create(chat_id: int):
     add_item_photos(item_id, data.get("photos", []))
     pending_create.pop(chat_id, None)
     bot.send_message(chat_id, create_preview_text(data), reply_markup=main_menu())
-    show_my_item(chat_id, item_id)
+    return item_id
 
 
 # =========================
@@ -684,8 +693,6 @@ def price_menu():
     kb.row("⚪ Любая цена")
     kb.row("⬅️ К фильтрам")
     return kb
-
-
 def show_filters_menu(chat_id: int, notice: Optional[str] = None):
     text = filters_status_text(chat_id)
     if notice:
@@ -938,6 +945,7 @@ def photo_handler(message):
     if chat_id in pending_replace_photo:
         item_id = pending_replace_photo[chat_id]["item_id"]
         photos = pending_replace_photo[chat_id]["photos"]
+
         if len(photos) >= MAX_PHOTOS_PER_ITEM:
             bot.send_message(chat_id, f"Можно максимум {MAX_PHOTOS_PER_ITEM} фото. Нажми «✅ Сохранить фото».")
             return
@@ -948,7 +956,7 @@ def photo_handler(message):
         if len(photos) >= MAX_PHOTOS_PER_ITEM:
             replace_item_photos(item_id, photos)
             pending_replace_photo.pop(chat_id, None)
-            bot.send_message(chat_id, "✅ Фото объявления обновлены")
+            bot.send_message(chat_id, "✅ Фото объявления обновлены", reply_markup=main_menu())
             show_my_item(chat_id, item_id)
         else:
             bot.send_message(
@@ -961,6 +969,7 @@ def photo_handler(message):
     # пошаговое добавление
     if chat_id in pending_create and pending_create[chat_id]["step"] == "photo":
         photos = pending_create[chat_id]["data"]["photos"]
+
         if len(photos) >= MAX_PHOTOS_PER_ITEM:
             bot.send_message(chat_id, f"Можно максимум {MAX_PHOTOS_PER_ITEM} фото. Нажми «✅ Опубликовать».")
             return
@@ -969,7 +978,8 @@ def photo_handler(message):
         pending_create[chat_id]["data"]["photos"] = photos
 
         if len(photos) >= MAX_PHOTOS_PER_ITEM:
-            finish_create(chat_id)
+            item_id = finish_create(chat_id)
+            show_my_item(chat_id, item_id)
         else:
             bot.send_message(
                 chat_id,
@@ -1084,642 +1094,5 @@ def create_category_handler(message):
 
 @bot.message_handler(func=lambda m: m.chat.id in pending_create and pending_create[m.chat.id]["step"] == "photo" and m.text in ["✅ Готово без ещё фото", "✅ Опубликовать"])
 def create_finish_handler(message):
-    finish_create(message.chat.id)
-
-
-# =========================
-# MAIN MENU
-# =========================
-@bot.message_handler(func=lambda m: m.text == "🔎 Смотреть")
-def menu_watch(message):
-    ensure_filters(message.chat.id)
-    user_index[message.chat.id] = 0
-    item = get_item_by_index(message.chat.id, 0)
-    if item:
-        set_view_state(message.chat.id, item[0], mode="feed", photo_idx=0)
-    show_item(message.chat.id, item, mode="feed")
-
-
-@bot.message_handler(func=lambda m: m.text == "➕ Добавить")
-def menu_add(message):
-    start_create_flow(message.chat.id)
-
-
-@bot.message_handler(func=lambda m: m.text == "❤️ Избранное")
-def menu_favorites(message):
-    chat_id = message.chat.id
-    user_id = get_user_id(chat_id)
-    fav_ids = get_favorites(user_id)
-
-    if not fav_ids:
-        bot.send_message(chat_id, "В избранном пока пусто ❤️")
-        return
-
-    placeholders = ",".join(["?"] * len(fav_ids))
-    cursor.execute(f"""
-        SELECT id, title, price, city, category, owner_tg, views, is_taken, bump_count, last_bump_at, created_at
-        FROM items
-        WHERE id IN ({placeholders}) AND is_taken = 0
-        ORDER BY id DESC
-    """, fav_ids)
-    rows = cursor.fetchall()
-
-    if not rows:
-        bot.send_message(chat_id, "В избранном сейчас нет активных объявлений")
-        return
-
-    text = "❤️ Избранное:\n\n"
-    for item in rows[:20]:
-        item_id, title, price, city, category, owner_tg, views, is_taken, bump_count, last_bump_at, created_at = item
-        text += f"#{item_id} — {title} | "
-        text += "Бесплатно" if price == 0 else f"{price} ₽"
-        text += f" | {city} | {category} | ❤️ {get_likes_count(item_id)} | 👁 {views}\n"
-
-    bot.send_message(chat_id, text)
-
-
-@bot.message_handler(func=lambda m: m.text == "⚙️ Фильтры")
-def menu_filters(message):
-    ensure_filters(message.chat.id)
-    show_filters_menu(message.chat.id)
-
-
-@bot.message_handler(func=lambda m: m.text == "🏠 Меню")
-def menu_sub(message):
-    bot.send_message(message.chat.id, "Дополнительное меню:", reply_markup=submenu_menu())
-
-
-# =========================
-# SUBMENU
-# =========================
-@bot.message_handler(func=lambda m: m.text == "📦 Мои объявления")
-def submenu_my_items(message):
-    chat_id = message.chat.id
-    rows = get_user_active_items(chat_id)
-
-    if not rows:
-        bot.send_message(chat_id, "У тебя пока нет активных объявлений", reply_markup=submenu_menu())
-        return
-
-    bot.send_message(chat_id, "📦 Выбери своё активное объявление:", reply_markup=submenu_menu())
-    bot.send_message(chat_id, "Список:", reply_markup=build_my_items_keyboard(chat_id))
-
-
-@bot.message_handler(func=lambda m: m.text == "🗂 Архив")
-def submenu_archive(message):
-    chat_id = message.chat.id
-    rows = get_user_archive_items(chat_id)
-
-    if not rows:
-        bot.send_message(chat_id, "В архиве пока пусто 🗂", reply_markup=submenu_menu())
-        return
-
-    bot.send_message(chat_id, "🗂 Выбери архивное объявление:", reply_markup=submenu_menu())
-    bot.send_message(chat_id, "Список:", reply_markup=build_archive_keyboard(chat_id))
-
-
-@bot.message_handler(func=lambda m: m.text == "📊 Статистика")
-def submenu_stats(message):
-    chat_id = message.chat.id
-    refs = get_referrals_count(chat_id)
-    my_items = get_user_items(chat_id)
-
-    total_views = sum(item[6] for item in my_items) if my_items else 0
-    total_likes = sum(get_likes_count(item[0]) for item in my_items) if my_items else 0
-
-    text = (
-        f"📊 Твоя статистика:\n\n"
-        f"👥 Приглашено друзей: {refs}\n"
-        f"📦 Твоих объявлений: {len(my_items)}\n"
-        f"👁 Просмотров объявлений: {total_views}\n"
-        f"❤️ Лайков на объявлениях: {total_likes}"
-    )
-    bot.send_message(chat_id, text, reply_markup=submenu_menu())
-
-
-@bot.message_handler(func=lambda m: m.text == "🎁 Пригласить")
-def submenu_invite(message):
-    me = bot.get_me()
-    invite_link = f"https://t.me/{me.username}?start=ref_{message.chat.id}"
-    count = get_referrals_count(message.chat.id)
-
-    bot.send_message(
-        message.chat.id,
-        "🎁 Пригласи друга по своей ссылке:\n\n"
-        f"{invite_link}\n\n"
-        f"Уже приглашено: {count}",
-        reply_markup=submenu_menu()
-    )
-
-
-@bot.message_handler(func=lambda m: m.text == "🆘 Помощь / правила")
-def submenu_help(message):
-    text = (
-        "🆘 Помощь / правила\n\n"
-        "1. Размещай реальные вещи\n"
-        "2. Не публикуй запрещённые товары\n"
-        "3. Будь вежлив с другими пользователями\n"
-        "4. Если вещь уже отдана — нажми ✅ Отдано\n"
-        f"5. Можно загрузить до {MAX_PHOTOS_PER_ITEM} фото\n"
-        "6. Чтобы добавить объявление — просто нажми ➕ Добавить\n\n"
-        "Запасная команда:\n"
-        "/add Название;Цена;Город;Категория"
-    )
-    bot.send_message(message.chat.id, text, reply_markup=submenu_menu())
-
-
-@bot.message_handler(func=lambda m: m.text == "🔥 Популярное")
-def submenu_popular(message):
-    rows = get_popular_items(10)
-
-    if not rows:
-        bot.send_message(message.chat.id, "Пока нет популярных объявлений", reply_markup=submenu_menu())
-        return
-
-    text = "🔥 Популярное:\n\n"
-    for row in rows:
-        item_id, title, price, city, category, owner_tg, views, is_taken, bump_count, last_bump_at, created_at, likes_count = row
-        text += f"#{item_id} — {title} | "
-        text += "Бесплатно" if price == 0 else f"{price} ₽"
-        text += f" | {city} | {category} | ❤️ {likes_count} | 👁 {views}\n"
-
-    bot.send_message(message.chat.id, text, reply_markup=submenu_menu())
-
-
-@bot.message_handler(func=lambda m: m.text == "🔍 Поиск")
-def submenu_search(message):
-    pending_search.add(message.chat.id)
-    bot.send_message(
-        message.chat.id,
-        "Напиши слово для поиска.\nНапример: куртка",
-        reply_markup=submenu_menu()
-    )
-
-
-@bot.message_handler(func=lambda m: m.text == "⬅️ Назад")
-def any_back(message):
-    bot.send_message(message.chat.id, "Главное меню:", reply_markup=main_menu())
-
-
-# =========================
-# FILTERS
-# =========================
-@bot.message_handler(func=lambda m: m.text == "📍 Город")
-def filter_city_menu(message):
-    bot.send_message(message.chat.id, "Выбери город:", reply_markup=city_menu())
-
-
-@bot.message_handler(func=lambda m: m.text == "📦 Категория")
-def filter_category_menu(message):
-    bot.send_message(message.chat.id, "Выбери категорию:", reply_markup=category_menu())
-
-
-@bot.message_handler(func=lambda m: m.text == "💰 Цена")
-def filter_price_menu(message):
-    bot.send_message(message.chat.id, "Выбери цену:", reply_markup=price_menu())
-
-
-@bot.message_handler(func=lambda m: m.text in POPULAR_CITIES or m.text == "🌍 Любой город")
-def set_city_filter(message):
-    ensure_filters(message.chat.id)
-    user_filters[message.chat.id]["city"] = None if message.text == "🌍 Любой город" else message.text
-    user_index[message.chat.id] = 0
-    show_filters_menu(message.chat.id, "Фильтр по городу обновлён")
-
-
-@bot.message_handler(func=lambda m: m.text in CATEGORIES or m.text == "🌍 Любая категория")
-def set_category_filter(message):
-    ensure_filters(message.chat.id)
-    user_filters[message.chat.id]["category"] = None if message.text == "🌍 Любая категория" else message.text
-    user_index[message.chat.id] = 0
-    show_filters_menu(message.chat.id, "Фильтр по категории обновлён")
-
-
-@bot.message_handler(func=lambda m: m.text in ["🟢 Бесплатно", "🟡 До 400 ₽", "⚪ Любая цена"])
-def set_price_filter(message):
-    ensure_filters(message.chat.id)
-
-    if message.text == "🟢 Бесплатно":
-        user_filters[message.chat.id]["price"] = "free"
-    elif message.text == "🟡 До 400 ₽":
-        user_filters[message.chat.id]["price"] = "under400"
-    else:
-        user_filters[message.chat.id]["price"] = "any"
-
-    user_index[message.chat.id] = 0
-    show_filters_menu(message.chat.id, "Фильтр по цене обновлён")
-
-
-@bot.message_handler(func=lambda m: m.text == "♻️ Сбросить фильтры")
-def reset_filters_handler(message):
-    reset_filters(message.chat.id)
-    user_index[message.chat.id] = 0
-    show_filters_menu(message.chat.id, "Все фильтры сброшены ♻️")
-
-
-@bot.message_handler(func=lambda m: m.text == "🔎 Показать")
-def show_filtered_items_handler(message):
-    chat_id = message.chat.id
-    items = get_filtered_items(chat_id)
-    count = len(items)
-
-    if count == 0:
-        total_active = get_total_active_items()
-        if total_active == 0:
-            bot.send_message(
-                chat_id,
-                "Пока вообще нет активных объявлений 😕\n\nДобавь первое через ➕ Добавить",
-                reply_markup=main_menu()
-            )
-        else:
-            bot.send_message(
-                chat_id,
-                "По выбранным фильтрам ничего не найдено 😕\n\nПопробуй изменить фильтры или сбросить их",
-                reply_markup=filters_menu()
-            )
-        return
-
-    user_index[chat_id] = 0
-    set_view_state(chat_id, items[0][0], mode="feed", photo_idx=0)
-    bot.send_message(chat_id, f"Найдено объявлений: {count}")
-    show_item(chat_id, items[0], mode="feed")
-
-
-@bot.message_handler(func=lambda m: m.text == "⬅️ К фильтрам")
-def back_to_filters(message):
-    show_filters_menu(message.chat.id)
-
-
-# =========================
-# SEARCH TEXT
-# =========================
-@bot.message_handler(func=lambda m: m.chat.id in pending_search)
-def handle_search_text(message):
-    chat_id = message.chat.id
-    pending_search.discard(chat_id)
-
-    query_text = (message.text or "").strip().lower()
-    if not query_text:
-        bot.send_message(chat_id, "Пустой запрос", reply_markup=submenu_menu())
-        return
-
-    rows = search_items(chat_id, query_text)
-    if not rows:
-        bot.send_message(chat_id, f"По запросу «{query_text}» ничего не найдено", reply_markup=submenu_menu())
-        return
-
-    text = f"🔍 Результаты поиска: {query_text}\n\n"
-    for item in rows[:20]:
-        item_id, title, price, city, category, owner_tg, views, is_taken, bump_count, last_bump_at, created_at = item
-        text += f"#{item_id} — {title} | "
-        text += "Бесплатно" if price == 0 else f"{price} ₽"
-        text += f" | {city} | {category} | ❤️ {get_likes_count(item_id)} | 👁 {views}\n"
-
-    bot.send_message(chat_id, text, reply_markup=submenu_menu())
-
-
-# =========================
-# CALLBACKS
-# =========================
-@bot.callback_query_handler(func=lambda call: True)
-def callback_handler(call):
-    chat_id = call.message.chat.id
-    data = call.data
-
-    if data == "next":
-        items = get_filtered_items(chat_id)
-        if not items:
-            bot.answer_callback_query(call.id, "Нет объявлений")
-            return
-
-        idx = user_index.get(chat_id, 0)
-        idx = (idx + 1) % len(items)
-        user_index[chat_id] = idx
-        set_view_state(chat_id, items[idx][0], mode="feed", photo_idx=0)
-        show_item(chat_id, items[idx], send_new=False, edit_message_id=call.message.message_id, mode="feed")
-        bot.answer_callback_query(call.id)
-        return
-
-    if data == "like":
-        st = view_state.get(chat_id)
-        if not st:
-            bot.answer_callback_query(call.id, "Нет объявления")
-            return
-
-        item_id = st["item_id"]
-        user_id = get_user_id(chat_id)
-
-        if has_like(user_id, item_id):
-            remove_like(user_id, item_id)
-            bot.answer_callback_query(call.id, "Лайк убран")
-        else:
-            add_like(user_id, item_id)
-            bot.answer_callback_query(call.id, "Лайк поставлен")
-
-        item = get_item_by_id(item_id)
-        if item and item[7] == 0:
-            show_item(chat_id, item, send_new=False, edit_message_id=call.message.message_id, count_view=False, mode=st.get("mode", "feed"))
-        return
-
-    if data == "fav":
-        st = view_state.get(chat_id)
-        if not st:
-            bot.answer_callback_query(call.id, "Нет объявления")
-            return
-
-        item_id = st["item_id"]
-        user_id = get_user_id(chat_id)
-        add_favorite(user_id, item_id)
-        bot.answer_callback_query(call.id, "Добавлено в избранное ❤️")
-        return
-
-    if data == "take":
-        st = view_state.get(chat_id)
-        if not st:
-            bot.answer_callback_query(call.id, "Нет объявления")
-            return
-
-        item = get_item_by_id(st["item_id"])
-        if not item:
-            bot.answer_callback_query(call.id, "Нет объявления")
-            return
-
-        owner_tg = item[5]
-        if owner_tg == chat_id:
-            bot.answer_callback_query(call.id, "Это твоё объявление")
-            return
-
-        bot.answer_callback_query(call.id, "Свяжись с владельцем через кнопку 💬")
-        return
-
-    if data.startswith("prevphoto_") or data.startswith("nextphoto_"):
-        try:
-            item_id = int(data.split("_", 1)[1])
-        except ValueError:
-            bot.answer_callback_query(call.id, "Ошибка")
-            return
-
-        item = get_item_by_id(item_id)
-        if not item:
-            bot.answer_callback_query(call.id, "Объявление не найдено")
-            return
-
-        photos = get_item_photos(item_id)
-        if len(photos) <= 1:
-            bot.answer_callback_query(call.id, "Фото только одно")
-            return
-
-        st = view_state.get(chat_id, {"photo_idx": 0, "mode": "feed"})
-        idx = st.get("photo_idx", 0)
-
-        if data.startswith("prevphoto_"):
-            idx = (idx - 1) % len(photos)
-        else:
-            idx = (idx + 1) % len(photos)
-
-        set_view_state(chat_id, item_id, mode=st.get("mode", "feed"), photo_idx=idx)
-        show_item(chat_id, item, send_new=False, edit_message_id=call.message.message_id, count_view=False, mode=st.get("mode", "feed"))
-        bot.answer_callback_query(call.id)
-        return
-
-    if data.startswith("report_"):
-        try:
-            item_id = int(data.split("_", 1)[1])
-        except ValueError:
-            bot.answer_callback_query(call.id, "Ошибка")
-            return
-        add_report(chat_id, item_id, "Жалоба")
-        bot.answer_callback_query(call.id, "Жалоба отправлена ⚠️")
-        return
-
-    if data.startswith("done_"):
-        try:
-            item_id = int(data.split("_", 1)[1])
-        except ValueError:
-            bot.answer_callback_query(call.id, "Ошибка")
-            return
-
-        item = get_item_by_id(item_id)
-        if not item or item[5] != chat_id:
-            bot.answer_callback_query(call.id, "Это не твоё объявление")
-            return
-
-        ok = mark_taken(item_id, chat_id)
-        if ok:
-            pending_edit.pop(chat_id, None)
-            pending_replace_photo.pop(chat_id, None)
-            bot.answer_callback_query(call.id, "Объявление перенесено в архив ✅")
-            try:
-                bot.delete_message(chat_id, call.message.message_id)
-            except Exception:
-                pass
-        else:
-            bot.answer_callback_query(call.id, "Не удалось перенести в архив")
-        return
-
-    if data.startswith("restore_"):
-        try:
-            item_id = int(data.split("_", 1)[1])
-        except ValueError:
-            bot.answer_callback_query(call.id, "Ошибка")
-            return
-
-        item = get_item_by_id(item_id)
-        if not item or item[5] != chat_id:
-            bot.answer_callback_query(call.id, "Это не твоё объявление")
-            return
-
-        ok = restore_item(item_id, chat_id)
-        if ok:
-            bot.answer_callback_query(call.id, "Объявление снова активно ♻️")
-            try:
-                bot.delete_message(chat_id, call.message.message_id)
-            except Exception:
-                pass
-            show_my_item(chat_id, item_id)
-        else:
-            bot.answer_callback_query(call.id, "Не удалось вернуть")
-        return
-
-    if data.startswith("delete_"):
-        try:
-            item_id = int(data.split("_", 1)[1])
-        except ValueError:
-            bot.answer_callback_query(call.id, "Ошибка")
-            return
-
-        item = get_item_by_id(item_id)
-        if not item or item[5] != chat_id:
-            bot.answer_callback_query(call.id, "Это не твоё объявление")
-            return
-
-        ok = delete_item(item_id, chat_id)
-        if ok:
-            pending_edit.pop(chat_id, None)
-            pending_replace_photo.pop(chat_id, None)
-            bot.answer_callback_query(call.id, "Удалено 🗑")
-            try:
-                bot.delete_message(chat_id, call.message.message_id)
-            except Exception:
-                pass
-        else:
-            bot.answer_callback_query(call.id, "Не удалось удалить")
-        return
-
-    if data.startswith("bump_"):
-        try:
-            item_id = int(data.split("_", 1)[1])
-        except ValueError:
-            bot.answer_callback_query(call.id, "Ошибка")
-            return
-
-        item = get_item_by_id(item_id)
-        if not item:
-            bot.answer_callback_query(call.id, "Объявление не найдено")
-            return
-
-        if item[5] != chat_id:
-            bot.answer_callback_query(call.id, "Можно поднимать только свои объявления")
-            return
-
-        if item[7] == 1:
-            bot.answer_callback_query(call.id, "Архивные объявления нельзя поднимать")
-            return
-
-        allowed, remain = can_bump_item(item_id, chat_id)
-        if not allowed:
-            bot.answer_callback_query(call.id, f"Можно через {format_seconds_to_human(remain)}")
-            return
-
-        new_item_id = bump_item(item_id, chat_id)
-        if new_item_id:
-            pending_replace_photo.pop(chat_id, None)
-            bot.answer_callback_query(call.id, "Объявление поднято 🚀")
-            try:
-                bot.delete_message(chat_id, call.message.message_id)
-            except Exception:
-                pass
-            show_my_item(chat_id, new_item_id)
-        else:
-            bot.answer_callback_query(call.id, "Не удалось поднять")
-        return
-
-    if data.startswith("myitem_"):
-        try:
-            item_id = int(data.split("_", 1)[1])
-        except ValueError:
-            bot.answer_callback_query(call.id, "Ошибка")
-            return
-
-        bot.answer_callback_query(call.id)
-        show_my_item(chat_id, item_id)
-        return
-
-    if data.startswith("architem_"):
-        try:
-            item_id = int(data.split("_", 1)[1])
-        except ValueError:
-            bot.answer_callback_query(call.id, "Ошибка")
-            return
-
-        bot.answer_callback_query(call.id)
-        show_archive_item(chat_id, item_id)
-        return
-
-    if data.startswith("edit_"):
-        try:
-            item_id = int(data.split("_", 1)[1])
-        except ValueError:
-            bot.answer_callback_query(call.id, "Ошибка")
-            return
-
-        item = get_item_by_id(item_id)
-        if not item or item[5] != chat_id:
-            bot.answer_callback_query(call.id, "Это не твоё объявление")
-            return
-
-        if item[7] == 1:
-            bot.answer_callback_query(call.id, "Архивное объявление сначала нужно вернуть")
-            return
-
-        pending_edit[chat_id] = item_id
-        bot.answer_callback_query(call.id, "Отправь новые данные")
-        bot.send_message(
-            chat_id,
-            "✏️ Отправь новые данные в формате:\n\n"
-            "Название;Цена;Город;Категория\n\n"
-            "Пример:\n"
-            "Куртка зимняя;0;Москва;Одежда"
-        )
-        return
-
-    if data.startswith("replacephotos_"):
-        try:
-            item_id = int(data.split("_", 1)[1])
-        except ValueError:
-            bot.answer_callback_query(call.id, "Ошибка")
-            return
-
-        item = get_item_by_id(item_id)
-        if not item or item[5] != chat_id:
-            bot.answer_callback_query(call.id, "Это не твоё объявление")
-            return
-
-        if item[7] == 1:
-            bot.answer_callback_query(call.id, "Архивное объявление сначала нужно вернуть")
-            return
-
-        pending_replace_photo[chat_id] = {
-            "item_id": item_id,
-            "photos": []
-        }
-        bot.answer_callback_query(call.id, "Отправь новые фото")
-        bot.send_message(
-            chat_id,
-            f"🖼 Отправь до {MAX_PHOTOS_PER_ITEM} новых фото.\n"
-            "Когда закончишь — нажми «✅ Сохранить фото»",
-            reply_markup=replace_photo_step_kb(0)
-        )
-        return
-
-
-# =========================
-# REPLACE PHOTOS FINISH
-# =========================
-@bot.message_handler(func=lambda m: m.chat.id in pending_replace_photo and m.text == "✅ Сохранить фото")
-def finish_replace_photos(message):
-    chat_id = message.chat.id
-    data = pending_replace_photo.get(chat_id)
-    if not data or not data["photos"]:
-        bot.send_message(chat_id, "Сначала отправь хотя бы одно фото.")
-        return
-
-    item_id = data["item_id"]
-    replace_item_photos(item_id, data["photos"])
-    pending_replace_photo.pop(chat_id, None)
-    bot.send_message(chat_id, "✅ Фото объявления обновлены", reply_markup=main_menu())
-    show_my_item(chat_id, item_id)
-
-
-# =========================
-# SAFE POLLING
-# =========================
-def run_bot():
-    print("=== BOT STARTING ===", flush=True)
-    bot.remove_webhook()
-    print("Webhook removed", flush=True)
-
-    while True:
-        try:
-            bot.infinity_polling(timeout=30, long_polling_timeout=20, skip_pending=True)
-        except ApiTelegramException as e:
-            print(f"Telegram error: {e}", flush=True)
-            time.sleep(5)
-        except Exception as e:
-            print(f"Unexpected error: {e}", flush=True)
-            time.sleep(5)
-
-
-if __name__ == "__main__":
-    run_bot()
-
+    item_id = finish_create(message.chat.id)
+    show_my_item(message.chat.id, item_id)
