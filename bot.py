@@ -95,13 +95,13 @@ conn.commit()
 # =========================
 # MEMORY
 # =========================
-user_index = {}
-pending_search = set()
-user_filters = {}
-pending_edit = {}
-pending_create = {}
-pending_replace_photo = {}
-view_state = {}
+user_index = {}               # chat_id -> current index in filtered feed
+pending_search = set()        # chat_id
+user_filters = {}             # chat_id -> filters
+pending_edit = {}             # chat_id -> item_id
+pending_create = {}           # chat_id -> create flow dict
+pending_replace_photo = {}    # chat_id -> {"item_id": int, "photos": []}
+view_state = {}               # chat_id -> {"item_id": int, "mode": str, "photo_idx": int}
 
 # =========================
 # CONSTANTS
@@ -153,6 +153,7 @@ def get_user_id(telegram_id: int) -> int:
 def add_referral(inviter_tg: int, invited_tg: int):
     if inviter_tg == invited_tg:
         return
+
     cursor.execute(
         "INSERT OR IGNORE INTO referrals (inviter_tg, invited_tg) VALUES (?, ?)",
         (inviter_tg, invited_tg)
@@ -531,8 +532,10 @@ def item_to_text(item, photo_idx: int = 0) -> str:
     likes_count = get_likes_count(item_id)
     photos = get_item_photos(item_id)
     photos_line = ""
+
     if photos:
-        photos_line = f"\n📸 Фото: {photo_idx + 1}/{len(photos)}"
+        safe_idx = min(photo_idx, len(photos) - 1)
+        photos_line = f"\n📸 Фото: {safe_idx + 1}/{len(photos)}"
 
     text = f"🧥 {title}\n"
     text += "🟢 Бесплатно\n" if price == 0 else f"💰 {price} ₽\n"
@@ -541,8 +544,10 @@ def item_to_text(item, photo_idx: int = 0) -> str:
     text += f"❤️ {likes_count} лайков\n"
     text += f"👁 {views} просмотров"
     text += photos_line
+
     if bump_count > 0:
         text += f"\n🚀 Поднимали: {bump_count} раз"
+
     return text
 
 
@@ -554,11 +559,8 @@ def set_view_state(chat_id: int, item_id: int, mode: str = "feed", photo_idx: in
     }
 
 
-def get_view_photo_idx(chat_id: int) -> int:
-    st = view_state.get(chat_id)
-    if not st:
-        return 0
-    return st.get("photo_idx", 0)
+def get_view_state(chat_id: int):
+    return view_state.get(chat_id, {"item_id": None, "mode": "feed", "photo_idx": 0})
 
 
 def build_share_text(item_id: int) -> str:
@@ -570,7 +572,6 @@ def build_share_text(item_id: int) -> str:
     price = item[2]
     city = item[3]
     category = item[4]
-
     price_text = "Бесплатно" if price == 0 else f"{price} ₽"
     username = bot.get_me().username
 
@@ -584,9 +585,8 @@ def build_share_text(item_id: int) -> str:
         f"https://t.me/{username}?start=item_{item_id}"
     )
 
-
 # =========================
-# STEP CREATE
+# CREATE FLOW KEYBOARDS
 # =========================
 def cancel_kb():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -661,7 +661,6 @@ def finish_create(chat_id: int):
     bot.send_message(chat_id, create_preview_text(data), reply_markup=main_menu())
     return item_id
 
-
 # =========================
 # UI
 # =========================
@@ -717,23 +716,33 @@ def price_menu():
     kb.row("⚪ Любая цена")
     kb.row("⬅️ К фильтрам")
     return kb
-# =========================
-# CARD KEYBOARD
-# =========================
-def build_card_keyboard(item_id: int):
-    item = get_item_by_id(item_id)
-    if not item:
-        return None
 
-    owner_tg = item[5]
-    viewer_user_id = get_user_id(item[5])
+
+def show_filters_menu(chat_id: int, notice: Optional[str] = None):
+    text = filters_status_text(chat_id)
+    if notice:
+        text = f"{notice}\n\n{text}"
+    bot.send_message(chat_id, text, reply_markup=filters_menu())
+
+
+def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
+    viewer_user_id = get_user_id(viewer_tg)
     likes_count = get_likes_count(item_id)
+    has_user_like = has_like(viewer_user_id, item_id)
+    like_text = f"💔 Убрать лайк ({likes_count})" if has_user_like else f"❤️ Лайк ({likes_count})"
 
+    photos = get_item_photos(item_id)
     kb = types.InlineKeyboardMarkup()
+
+    if len(photos) > 1:
+        kb.row(
+            types.InlineKeyboardButton("⬅️ Фото", callback_data=f"prevphoto_{item_id}"),
+            types.InlineKeyboardButton("Фото ➡️", callback_data=f"nextphoto_{item_id}")
+        )
 
     kb.row(
         types.InlineKeyboardButton("➡️ Следующее", callback_data="next"),
-        types.InlineKeyboardButton(f"❤️ Лайк ({likes_count})", callback_data=f"like_{item_id}")
+        types.InlineKeyboardButton(like_text, callback_data=f"like_{item_id}")
     )
 
     kb.row(
@@ -745,246 +754,196 @@ def build_card_keyboard(item_id: int):
         types.InlineKeyboardButton("📍 Поделиться объявлением", callback_data=f"share_{item_id}")
     )
 
-    kb.row(
-        types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}"),
-        types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
-    )
-
-    kb.row(
-        types.InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{item_id}")
-    )
-
-    kb.row(
-        types.InlineKeyboardButton("✅ Отдано", callback_data=f"taken_{item_id}")
-    )
+    if owner_tg == viewer_tg:
+        kb.row(
+            types.InlineKeyboardButton("✅ Отдано", callback_data=f"taken_{item_id}"),
+            types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}")
+        )
+        kb.row(
+            types.InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{item_id}"),
+            types.InlineKeyboardButton("📷 Заменить фото", callback_data=f"replacephoto_{item_id}")
+        )
+        kb.row(
+            types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
+        )
+    else:
+        kb.row(
+            types.InlineKeyboardButton("✅ Забрать", callback_data=f"take_{item_id}"),
+            types.InlineKeyboardButton("⚠️ Жалоба", callback_data=f"report_{item_id}")
+        )
 
     return kb
 
 
-# =========================
-# SHOW ITEM
-# =========================
-def show_item(chat_id: int, item):
+def build_archive_card_keyboard(item_id: int):
+    kb = types.InlineKeyboardMarkup()
+    kb.row(
+        types.InlineKeyboardButton("♻️ Вернуть", callback_data=f"restore_{item_id}"),
+        types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
+    )
+    return kb
+
+
+def show_item(chat_id: int, item, count_view: bool = True, mode: str = "feed"):
     if not item:
-        bot.send_message(chat_id, "Объявлений нет 😔")
+        total_active = get_total_active_items()
+        if total_active == 0:
+            bot.send_message(
+                chat_id,
+                "Пока вообще нет активных объявлений 😕\n\nДобавь первое через ➕ Добавить",
+                reply_markup=main_menu()
+            )
+        else:
+            bot.send_message(
+                chat_id,
+                "По текущим фильтрам объявлений нет 😕\n\nПопробуй ♻️ Сбросить фильтры",
+                reply_markup=main_menu()
+            )
         return
 
-    item_id = item[0]
-    add_view(item_id)
+    item_id, title, price, city, category, owner_tg, views, is_taken, bump_count, last_bump_at, created_at = item
 
+    if count_view:
+        add_view(item_id)
+
+    fresh_item = get_item_by_id(item_id)
+    if not fresh_item:
+        bot.send_message(chat_id, "Объявление уже недоступно", reply_markup=main_menu())
+        return
+
+    if fresh_item[7] == 1:
+        bot.send_message(chat_id, "Это объявление уже в архиве", reply_markup=submenu_menu())
+        return
+
+    state = get_view_state(chat_id)
     photos = get_item_photos(item_id)
-    photo_idx = get_view_photo_idx(chat_id)
+    photo_idx = state.get("photo_idx", 0)
+    if photos:
+        photo_idx = min(photo_idx, len(photos) - 1)
+    else:
+        photo_idx = 0
 
-    text = item_to_text(item, photo_idx)
-    keyboard = build_card_keyboard(item_id)
+    set_view_state(chat_id, item_id, mode=mode, photo_idx=photo_idx)
+
+    text = item_to_text(fresh_item, photo_idx)
+    reply_markup = build_card_keyboard(item_id, chat_id, owner_tg)
 
     if photos:
         try:
-            bot.send_photo(
-                chat_id,
-                photos[photo_idx],
-                caption=text,
-                reply_markup=keyboard
-            )
+            bot.send_photo(chat_id, photos[photo_idx], caption=text, reply_markup=reply_markup)
             return
         except ApiTelegramException:
             pass
 
-    bot.send_message(chat_id, text, reply_markup=keyboard)
+    bot.send_message(chat_id, text, reply_markup=reply_markup)
 
 
 def show_my_item(chat_id: int, item_id: int):
     item = get_item_by_id(item_id)
     if not item:
-        bot.send_message(chat_id, "Объявление не найдено")
+        bot.send_message(chat_id, "Объявление не найдено", reply_markup=submenu_menu())
+        return
+
+    if item[5] != chat_id:
+        bot.send_message(chat_id, "Это не твоё объявление", reply_markup=submenu_menu())
+        return
+
+    if item[7] == 1:
+        bot.send_message(chat_id, "Это объявление уже в архиве", reply_markup=submenu_menu())
+        return
+
+    set_view_state(chat_id, item_id, mode="my", photo_idx=0)
+    show_item(chat_id, item, count_view=False, mode="my")
+
+
+def show_archive_item(chat_id: int, item_id: int):
+    item = get_item_by_id(item_id)
+    if not item:
+        bot.send_message(chat_id, "Архивное объявление не найдено", reply_markup=submenu_menu())
+        return
+
+    if item[5] != chat_id:
+        bot.send_message(chat_id, "Это не твоё объявление", reply_markup=submenu_menu())
+        return
+
+    if item[7] == 0:
+        bot.send_message(chat_id, "Это объявление уже активно", reply_markup=submenu_menu())
         return
 
     photos = get_item_photos(item_id)
-    text = item_to_text(item)
-
-    kb = types.InlineKeyboardMarkup()
-
-    kb.row(
-        types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}"),
-        types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
-    )
-
-    kb.row(
-        types.InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{item_id}")
-    )
-
-    kb.row(
-        types.InlineKeyboardButton("📍 Поделиться объявлением", callback_data=f"share_{item_id}")
-    )
-
-    kb.row(
-        types.InlineKeyboardButton("📷 Заменить фото", callback_data=f"replacephoto_{item_id}")
-    )
-
-    kb.row(
-        types.InlineKeyboardButton("✅ Отдано", callback_data=f"taken_{item_id}")
-    )
+    text = item_to_text(item, 0) + "\n\n🗂 Статус: в архиве"
+    reply_markup = build_archive_card_keyboard(item[0])
 
     if photos:
-        bot.send_photo(chat_id, photos[0], caption=text, reply_markup=kb)
+        bot.send_photo(chat_id, photos[0], caption=text, reply_markup=reply_markup)
     else:
-        bot.send_message(chat_id, text, reply_markup=kb)
-
-
-# =========================
-# SHOW FILTER MENU
-# =========================
-def show_filters_menu(chat_id: int, notice: Optional[str] = None):
-    text = filters_status_text(chat_id)
-
-    if notice:
-        text = f"{notice}\n\n{text}"
-
-    bot.send_message(
-        chat_id,
-        text,
-        reply_markup=filters_menu()
-    )
-
+        bot.send_message(chat_id, text, reply_markup=reply_markup)
 
 # =========================
-# START
+# COMMANDS
 # =========================
 @bot.message_handler(commands=["start"])
 def start(message):
     chat_id = message.chat.id
-    args = message.text.split()
+    parts = message.text.split()
 
     get_user_id(chat_id)
 
-    if len(args) > 1 and args[1].startswith("ref_"):
+    if len(parts) > 1 and parts[1].startswith("ref_"):
         try:
-            inviter = int(args[1].split("_")[1])
-            add_referral(inviter, chat_id)
-        except:
+            inviter_tg = int(parts[1].replace("ref_", ""))
+            add_referral(inviter_tg, chat_id)
+        except ValueError:
             pass
 
-    if len(args) > 1 and args[1].startswith("item_"):
+    if len(parts) > 1 and parts[1].startswith("item_"):
         try:
-            item_id = int(args[1].split("_")[1])
+            item_id = int(parts[1].replace("item_", ""))
             item = get_item_by_id(item_id)
-            if item:
-                show_item(chat_id, item)
+            if item and item[7] == 0:
+                set_view_state(chat_id, item_id, mode="feed", photo_idx=0)
+                show_item(chat_id, item, mode="feed")
                 return
-        except:
+        except ValueError:
             pass
+
+    reset_filters(chat_id)
+    user_index[chat_id] = 0
 
     bot.send_message(
         chat_id,
-        "Добро пожаловать в Даром 🎁\n\n"
-        "Здесь можно отдавать вещи бесплатно.",
+        "Добро пожаловать в Даром 🎁\n\nЗдесь можно отдавать вещи бесплатно.",
         reply_markup=main_menu()
     )
 
+@bot.message_handler(commands=["add"])
+def add_cmd(message):
+    chat_id = message.chat.id
+    raw = message.text.replace("/add", "", 1).strip()
+    parsed = parse_edit_text(raw)
+
+    if not parsed:
+        bot.send_message(
+            chat_id,
+            "❌ Формат:\n/add Название;Цена;Город;Категория\n\nПример:\n/add Куртка;0;Москва;Одежда"
+        )
+        return
+
+    title, price, city, category = parsed
+    item_id = add_item(title, price, city, category, chat_id)
+
+    bot.send_message(
+        chat_id,
+        f"✅ Добавлено:\n🧥 {title}\n"
+        + ("🟢 Бесплатно\n" if price == 0 else f"💰 {price} ₽\n")
+        + f"📍 {city}\n"
+        + f"📦 {category}",
+        reply_markup=main_menu()
+    )
+    show_my_item(chat_id, item_id)
 
 # =========================
 # MAIN MENU
-# =========================
-@bot.message_handler(func=lambda m: m.text == "🏠 Меню")
-def menu(message):
-    bot.send_message(
-        message.chat.id,
-        "Дополнительное меню:",
-        reply_markup=submenu_menu()
-    )
-
-
-@bot.message_handler(func=lambda m: m.text == "⬅️ Назад")
-def back(message):
-    bot.send_message(
-        message.chat.id,
-        "Главное меню:",
-        reply_markup=main_menu()
-    )
-
-
-# =========================
-# FILTERS
-# =========================
-@bot.message_handler(func=lambda m: m.text == "⚙️ Фильтры")
-def filters(message):
-    show_filters_menu(message.chat.id)
-
-
-@bot.message_handler(func=lambda m: m.text == "📍 Город")
-def filter_city(message):
-    bot.send_message(message.chat.id, "Выбери город:", reply_markup=city_menu())
-
-
-@bot.message_handler(func=lambda m: m.text == "📦 Категория")
-def filter_category(message):
-    bot.send_message(message.chat.id, "Выбери категорию:", reply_markup=category_menu())
-
-
-@bot.message_handler(func=lambda m: m.text == "💰 Цена")
-def filter_price(message):
-    bot.send_message(message.chat.id, "Выбери цену:", reply_markup=price_menu())
-
-
-@bot.message_handler(func=lambda m: m.text == "♻️ Сбросить фильтры")
-def reset_filter(message):
-    reset_filters(message.chat.id)
-    show_filters_menu(message.chat.id, "♻️ Фильтры сброшены")
-
-
-@bot.message_handler(func=lambda m: m.text == "🔎 Показать")
-def show_filtered(message):
-    chat_id = message.chat.id
-    items = get_filtered_items(chat_id)
-
-    if not items:
-        bot.send_message(chat_id, "По текущим фильтрам объявлений нет 😔")
-        return
-
-    user_index[chat_id] = 0
-    item = items[0]
-    set_view_state(chat_id, item[0])
-    show_item(chat_id, item)
-    
-@bot.message_handler(func=lambda m: m.text in POPULAR_CITIES or m.text == "🌍 Любой город")
-def set_city_filter(message):
-
-    if message.chat.id in pending_create:
-        return
-    ensure_filters(message.chat.id)
-    user_filters[message.chat.id]["city"] = None if message.text == "🌍 Любой город" else message.text
-    show_filters_menu(message.chat.id, "📍 Фильтр по городу обновлён")
-
-
-@bot.message_handler(func=lambda m: m.text in CATEGORIES or m.text == "🌍 Любая категория")
-def set_category_filter(message):
-
-    if message.chat.id in pending_create:
-        return
-    ensure_filters(message.chat.id)
-    user_filters[message.chat.id]["category"] = None if message.text == "🌍 Любая категория" else message.text
-    show_filters_menu(message.chat.id, "📦 Фильтр по категории обновлён")
-
-
-@bot.message_handler(func=lambda m: m.text in ["🟢 Бесплатно", "🟡 До 400 ₽", "⚪ Любая цена"])
-def set_price_filter(message):
-
-    if message.chat.id in pending_create:
-        return
-    ensure_filters(message.chat.id)
-
-    if message.text == "🟢 Бесплатно":
-        user_filters[message.chat.id]["price"] = "free"
-    elif message.text == "🟡 До 400 ₽":
-        user_filters[message.chat.id]["price"] = "under400"
-    else:
-        user_filters[message.chat.id]["price"] = "any"
-
-    show_filters_menu(message.chat.id, "💰 Фильтр по цене обновлён")
-
-
-# =========================
-# WATCH / FAVORITES / MY ITEMS
 # =========================
 @bot.message_handler(func=lambda m: m.text == "🔎 Смотреть")
 def watch_items(message):
@@ -1001,6 +960,11 @@ def watch_items(message):
     show_item(chat_id, item)
 
 
+@bot.message_handler(func=lambda m: m.text == "➕ Добавить")
+def add_menu(message):
+    start_create_flow(message.chat.id)
+
+
 @bot.message_handler(func=lambda m: m.text == "❤️ Избранное")
 def favorites_menu(message):
     chat_id = message.chat.id
@@ -1008,27 +972,53 @@ def favorites_menu(message):
     fav_ids = get_favorites(user_id)
 
     if not fav_ids:
-        bot.send_message(chat_id, "В избранном пока пусто ❤️")
+        bot.send_message(chat_id, "В избранном пока пусто ❤️", reply_markup=main_menu())
         return
 
-    lines = ["❤️ Избранное:\n"]
+    rows = []
     for item_id in fav_ids:
         item = get_item_by_id(item_id)
-        if not item or item[7] == 1:
-            continue
-        lines.append(short_item_label(item))
+        if item and item[7] == 0:
+            rows.append(item)
 
-    text = "\n".join(lines) if len(lines) > 1 else "В избранном пока нет активных объявлений"
+    if not rows:
+        bot.send_message(chat_id, "В избранном сейчас нет активных объявлений", reply_markup=main_menu())
+        return
+
+    text = "❤️ Избранное:\n\n"
+    for item in rows[:20]:
+        item_id, title, price, city, category, owner_tg, views, is_taken, bump_count, last_bump_at, created_at = item
+        text += f"#{item_id} — {title} | "
+        text += "Бесплатно" if price == 0 else f"{price} ₽"
+        text += f" | {city} | {category} | ❤️ {get_likes_count(item_id)} | 👁 {views}\n"
+
     bot.send_message(chat_id, text, reply_markup=main_menu())
 
 
+@bot.message_handler(func=lambda m: m.text == "⚙️ Фильтры")
+def filters(message):
+    show_filters_menu(message.chat.id)
+
+
+@bot.message_handler(func=lambda m: m.text == "🏠 Меню")
+def menu(message):
+    bot.send_message(message.chat.id, "Дополнительное меню:", reply_markup=submenu_menu())
+
+
+@bot.message_handler(func=lambda m: m.text == "⬅️ Назад")
+def back(message):
+    bot.send_message(message.chat.id, "Главное меню:", reply_markup=main_menu())
+
+# =========================
+# SUBMENU
+# =========================
 @bot.message_handler(func=lambda m: m.text == "📦 Мои объявления")
 def my_items_menu(message):
     chat_id = message.chat.id
     rows = get_user_active_items(chat_id)
 
     if not rows:
-        bot.send_message(chat_id, "У тебя пока нет активных объявлений")
+        bot.send_message(chat_id, "У тебя пока нет активных объявлений", reply_markup=submenu_menu())
         return
 
     kb = types.InlineKeyboardMarkup()
@@ -1044,7 +1034,7 @@ def archive_menu(message):
     rows = get_user_archive_items(chat_id)
 
     if not rows:
-        bot.send_message(chat_id, "Архив пуст 🗂")
+        bot.send_message(chat_id, "Архив пуст 🗂", reply_markup=submenu_menu())
         return
 
     kb = types.InlineKeyboardMarkup()
@@ -1104,7 +1094,7 @@ def popular_menu(message):
     rows = get_popular_items(10)
 
     if not rows:
-        bot.send_message(message.chat.id, "Пока нет популярных объявлений")
+        bot.send_message(message.chat.id, "Пока нет популярных объявлений", reply_markup=submenu_menu())
         return
 
     text = "🔥 Популярное:\n\n"
@@ -1123,7 +1113,7 @@ def search_menu(message):
     bot.send_message(message.chat.id, "Напиши слово для поиска.\nНапример: куртка", reply_markup=submenu_menu())
 
 
-@bot.message_handler(func=lambda m: m.chat.id in pending_search)
+@bot.message_handler(func=lambda m: m.chat.id in pending_search and m.chat.id not in pending_create)
 def search_text_handler(message):
     chat_id = message.chat.id
     pending_search.discard(chat_id)
@@ -1144,15 +1134,89 @@ def search_text_handler(message):
 
     bot.send_message(chat_id, text, reply_markup=submenu_menu())
 
+# =========================
+# FILTERS
+# =========================
+@bot.message_handler(func=lambda m: m.text == "📍 Город" and m.chat.id not in pending_create)
+def filter_city(message):
+    bot.send_message(message.chat.id, "Выбери город:", reply_markup=city_menu())
+
+
+@bot.message_handler(func=lambda m: m.text == "📦 Категория" and m.chat.id not in pending_create)
+def filter_category(message):
+    bot.send_message(message.chat.id, "Выбери категорию:", reply_markup=category_menu())
+
+
+@bot.message_handler(func=lambda m: m.text == "💰 Цена" and m.chat.id not in pending_create)
+def filter_price(message):
+    bot.send_message(message.chat.id, "Выбери цену:", reply_markup=price_menu())
+
+
+@bot.message_handler(func=lambda m: m.text == "♻️ Сбросить фильтры" and m.chat.id not in pending_create)
+def reset_filter(message):
+    reset_filters(message.chat.id)
+    show_filters_menu(message.chat.id, "♻️ Фильтры сброшены")
+
+
+@bot.message_handler(func=lambda m: m.text == "🔎 Показать" and m.chat.id not in pending_create)
+def show_filtered(message):
+    chat_id = message.chat.id
+    items = get_filtered_items(chat_id)
+
+    if not items:
+        bot.send_message(chat_id, "По текущим фильтрам объявлений нет 😔", reply_markup=filters_menu())
+        return
+
+    user_index[chat_id] = 0
+    item = items[0]
+    set_view_state(chat_id, item[0], "feed", 0)
+    show_item(chat_id, item)
+
+
+@bot.message_handler(func=lambda m: m.text in POPULAR_CITIES or m.text == "🌍 Любой город")
+def set_city_filter(message):
+    if message.chat.id in pending_create:
+        return
+
+    ensure_filters(message.chat.id)
+    user_filters[message.chat.id]["city"] = None if message.text == "🌍 Любой город" else message.text
+    show_filters_menu(message.chat.id, "📍 Фильтр по городу обновлён")
+
+
+@bot.message_handler(func=lambda m: m.text in CATEGORIES or m.text == "🌍 Любая категория")
+def set_category_filter(message):
+    if message.chat.id in pending_create:
+        return
+
+    ensure_filters(message.chat.id)
+    user_filters[message.chat.id]["category"] = None if message.text == "🌍 Любая категория" else message.text
+    show_filters_menu(message.chat.id, "📦 Фильтр по категории обновлён")
+
+
+@bot.message_handler(func=lambda m: m.text in ["🟢 Бесплатно", "🟡 До 400 ₽", "⚪ Любая цена"])
+def set_price_filter(message):
+    if message.chat.id in pending_create:
+        return
+
+    ensure_filters(message.chat.id)
+
+    if message.text == "🟢 Бесплатно":
+        user_filters[message.chat.id]["price"] = "free"
+    elif message.text == "🟡 До 400 ₽":
+        user_filters[message.chat.id]["price"] = "under400"
+    else:
+        user_filters[message.chat.id]["price"] = "any"
+
+    show_filters_menu(message.chat.id, "💰 Фильтр по цене обновлён")
+
+
+@bot.message_handler(func=lambda m: m.text == "⬅️ К фильтрам" and m.chat.id not in pending_create)
+def back_to_filters(message):
+    show_filters_menu(message.chat.id)
 
 # =========================
 # CREATE FLOW
 # =========================
-@bot.message_handler(func=lambda m: m.text == "➕ Добавить")
-def add_menu(message):
-    start_create_flow(message.chat.id)
-
-
 @bot.message_handler(func=lambda m: m.text == "❌ Отмена" and m.chat.id in pending_create)
 def cancel_create(message):
     pending_create.pop(message.chat.id, None)
@@ -1317,7 +1381,6 @@ def finish_replace_photos(message):
     bot.send_message(chat_id, "✅ Фото объявления обновлены", reply_markup=main_menu())
     show_my_item(chat_id, item_id)
 
-
 # =========================
 # CALLBACKS
 # =========================
@@ -1340,6 +1403,36 @@ def callback_handler(call):
         bot.answer_callback_query(call.id)
         return
 
+    if data.startswith("prevphoto_") or data.startswith("nextphoto_"):
+        try:
+            item_id = int(data.split("_", 1)[1])
+        except ValueError:
+            bot.answer_callback_query(call.id, "Ошибка")
+            return
+
+        item = get_item_by_id(item_id)
+        if not item:
+            bot.answer_callback_query(call.id, "Объявление не найдено")
+            return
+
+        photos = get_item_photos(item_id)
+        if len(photos) <= 1:
+            bot.answer_callback_query(call.id, "Фото только одно")
+            return
+
+        st = get_view_state(chat_id)
+        idx = st.get("photo_idx", 0)
+
+        if data.startswith("prevphoto_"):
+            idx = (idx - 1) % len(photos)
+        else:
+            idx = (idx + 1) % len(photos)
+
+        set_view_state(chat_id, item_id, mode=st.get("mode", "feed"), photo_idx=idx)
+        show_item(chat_id, item, count_view=False, mode=st.get("mode", "feed"))
+        bot.answer_callback_query(call.id)
+        return
+
     if data.startswith("like_"):
         item_id = int(data.split("_")[1])
         user_id = get_user_id(chat_id)
@@ -1350,6 +1443,11 @@ def callback_handler(call):
         else:
             add_like(user_id, item_id)
             bot.answer_callback_query(call.id, "Лайк поставлен")
+
+        item = get_item_by_id(item_id)
+        if item and item[7] == 0:
+            st = get_view_state(chat_id)
+            show_item(chat_id, item, count_view=False, mode=st.get("mode", "feed"))
         return
 
     if data.startswith("fav_"):
@@ -1362,12 +1460,39 @@ def callback_handler(call):
     if data.startswith("share_"):
         try:
             item_id = int(data.split("_")[1])
-        except:
+        except ValueError:
             bot.answer_callback_query(call.id, "Ошибка")
             return
 
         bot.send_message(chat_id, build_share_text(item_id), reply_markup=main_menu())
         bot.answer_callback_query(call.id, "Ссылка отправлена")
+        return
+
+    if data.startswith("take_"):
+        item_id = int(data.split("_")[1])
+        item = get_item_by_id(item_id)
+
+        if not item:
+            bot.answer_callback_query(call.id, "Объявление не найдено")
+            return
+
+        owner_tg = item[5]
+        if owner_tg == chat_id:
+            bot.answer_callback_query(call.id, "Это твоё объявление")
+            return
+
+        bot.answer_callback_query(call.id, "Свяжись с владельцем через кнопку 💬")
+        return
+
+    if data.startswith("report_"):
+        try:
+            item_id = int(data.split("_")[1])
+        except ValueError:
+            bot.answer_callback_query(call.id, "Ошибка")
+            return
+
+        add_report(chat_id, item_id, "Жалоба")
+        bot.answer_callback_query(call.id, "Жалоба отправлена ⚠️")
         return
 
     if data.startswith("bump_"):
@@ -1430,6 +1555,21 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "Не удалось")
         return
 
+    if data.startswith("restore_"):
+        item_id = int(data.split("_")[1])
+        item = get_item_by_id(item_id)
+
+        if not item or item[5] != chat_id:
+            bot.answer_callback_query(call.id, "Это не твоё объявление")
+            return
+
+        if restore_item(item_id, chat_id):
+            bot.answer_callback_query(call.id, "Объявление возвращено ♻️")
+            show_my_item(chat_id, item_id)
+        else:
+            bot.answer_callback_query(call.id, "Не удалось вернуть")
+        return
+
     if data.startswith("edit_"):
         item_id = int(data.split("_")[1])
         item = get_item_by_id(item_id)
@@ -1474,20 +1614,12 @@ def callback_handler(call):
 
     if data.startswith("architem_"):
         item_id = int(data.split("_")[1])
-        item = get_item_by_id(item_id)
-
-        if not item:
-            bot.answer_callback_query(call.id, "Не найдено")
-            return
-
-        text = item_to_text(item)
-        bot.send_message(chat_id, "🗂 Архивное объявление:\n\n" + text, reply_markup=submenu_menu())
+        show_archive_item(chat_id, item_id)
         bot.answer_callback_query(call.id)
         return
 
-
 # =========================
-# RUN
+# SAFE POLLING
 # =========================
 def run_bot():
     print("=== BOT STARTING ===", flush=True)
@@ -1506,4 +1638,4 @@ def run_bot():
 
 
 if __name__ == "__main__":
-    run_bot()   
+    run_bot()
