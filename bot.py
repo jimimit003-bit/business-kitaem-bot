@@ -1439,7 +1439,38 @@ def callback_handler(call):
         if not st:
             bot.answer_callback_query(call.id, "Нет объявления")
             return
+    if data.startswith("share_"):
+    try:
+        item_id = int(data.split("_")[1])
+    except:
+        bot.answer_callback_query(call.id, "Ошибка")
+        return
 
+    item = get_item_by_id(item_id)
+
+    if not item:
+        bot.answer_callback_query(call.id, "Объявление не найдено")
+        return
+
+    title = item[1]
+    price = item[2]
+    city = item[3]
+    category = item[4]
+
+    price_text = "Бесплатно" if price == 0 else f"{price} ₽"
+
+    text = (
+        "📍 Поделиться объявлением\n\n"
+        f"🧥 {title}\n"
+        f"💰 {price_text}\n"
+        f"📍 {city}\n"
+        f"📦 {category}\n\n"
+        "Открыть в боте:\n"
+        f"https://t.me/{bot.get_me().username}?start=item_{item_id}"
+    )
+
+    bot.send_message(chat_id, text)
+    bot.answer_callback_query(call.id, "Ссылка отправлена")
         item_id = st["item_id"]
         user_id = get_user_id(chat_id)
         add_favorite(user_id, item_id)
