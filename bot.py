@@ -1173,11 +1173,8 @@ def show_filtered(message):
     show_item(chat_id, item)
 
 
-@bot.message_handler(func=lambda m: m.text in POPULAR_CITIES or m.text == "🌍 Любой город")
+@bot.message_handler(func=lambda m: (m.text in POPULAR_CITIES or m.text == "🌍 Любой город") and m.chat.id not in pending_create)
 def set_city_filter(message):
-    if message.chat.id in pending_create:
-        return
-
     ensure_filters(message.chat.id)
     user_filters[message.chat.id]["city"] = None if message.text == "🌍 Любой город" else message.text
     show_filters_menu(message.chat.id, "📍 Фильтр по городу обновлён")
