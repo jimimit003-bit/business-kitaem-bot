@@ -1187,11 +1187,8 @@ def set_category_filter(message):
     show_filters_menu(message.chat.id, "📦 Фильтр по категории обновлён")
 
 
-@bot.message_handler(func=lambda m: m.text in ["🟢 Бесплатно", "🟡 До 400 ₽", "⚪ Любая цена"])
+@bot.message_handler(func=lambda m: m.text in ["🟢 Бесплатно", "🟡 До 400 ₽", "⚪ Любая цена"] and m.chat.id not in pending_create)
 def set_price_filter(message):
-    if message.chat.id in pending_create:
-        return
-
     ensure_filters(message.chat.id)
 
     if message.text == "🟢 Бесплатно":
