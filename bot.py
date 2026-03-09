@@ -719,9 +719,13 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
         types.InlineKeyboardButton(like_text, callback_data="like")
     )
     kb.row(
-        types.InlineKeyboardButton("❤️ В избранное", callback_data="fav"),
-        types.InlineKeyboardButton("💬 Написать владельцу", url=f"tg://user?id={owner_tg}")
-    )
+    types.InlineKeyboardButton("❤️ В избранное", callback_data="fav"),
+    types.InlineKeyboardButton("💬 Написать владельцу", url=f"tg://user?id={owner_tg}")
+)
+
+kb.row(
+    types.InlineKeyboardButton("📍 Поделиться", callback_data=f"share_{item_id}")
+)
 
     if owner_tg == viewer_tg:
         kb.row(
