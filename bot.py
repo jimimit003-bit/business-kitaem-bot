@@ -95,11 +95,11 @@ conn.commit()
 # =========================
 # MEMORY
 # =========================
-user_index = {}               # chat_id -> current index in filtered feed
+user_index = {}               # chat_id -> index in current feed
 pending_search = set()        # chat_id
-user_filters = {}             # chat_id -> filters
+user_filters = {}             # chat_id -> filters dict
 pending_edit = {}             # chat_id -> item_id
-pending_create = {}           # chat_id -> create flow dict
+pending_create = {}           # chat_id -> {"step": "...", "data": {...}}
 pending_replace_photo = {}    # chat_id -> {"item_id": int, "photos": []}
 view_state = {}               # chat_id -> {"item_id": int, "mode": str, "photo_idx": int}
 
@@ -147,16 +147,9 @@ def reset_filters(chat_id: int):
 
 
 def get_user_id(telegram_id: int) -> int:
-    cursor.execute(
-        "INSERT OR IGNORE INTO users (telegram_id) VALUES (?)",
-        (telegram_id,)
-    )
+    cursor.execute("INSERT OR IGNORE INTO users (telegram_id) VALUES (?)", (telegram_id,))
     conn.commit()
-
-    cursor.execute(
-        "SELECT id FROM users WHERE telegram_id = ?",
-        (telegram_id,)
-    )
+    cursor.execute("SELECT id FROM users WHERE telegram_id = ?", (telegram_id,))
     row = cursor.fetchone()
     return row[0]
 
@@ -164,7 +157,6 @@ def get_user_id(telegram_id: int) -> int:
 def add_referral(inviter_tg: int, invited_tg: int):
     if inviter_tg == invited_tg:
         return
-
     cursor.execute(
         "INSERT OR IGNORE INTO referrals (inviter_tg, invited_tg) VALUES (?, ?)",
         (inviter_tg, invited_tg)
@@ -173,10 +165,7 @@ def add_referral(inviter_tg: int, invited_tg: int):
 
 
 def get_referrals_count(inviter_tg: int) -> int:
-    cursor.execute(
-        "SELECT COUNT(*) FROM referrals WHERE inviter_tg = ?",
-        (inviter_tg,)
-    )
+    cursor.execute("SELECT COUNT(*) FROM referrals WHERE inviter_tg = ?", (inviter_tg,))
     row = cursor.fetchone()
     return row[0] if row else 0
 
@@ -340,7 +329,6 @@ def can_bump_item(item_id: int, owner_tg: int):
         WHERE id = ? AND owner_tg = ?
     """, (item_id, owner_tg))
     row = cursor.fetchone()
-
     if not row:
         return False, 0
 
@@ -597,7 +585,7 @@ def build_share_text(item_id: int) -> str:
     )
 
 # =========================
-# CREATE FLOW KEYBOARDS
+# KEYBOARDS
 # =========================
 def cancel_kb():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -605,15 +593,14 @@ def cancel_kb():
     return kb
 
 
-def category_menu():
+def category_pick_kb():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     kb.row("Одежда", "Обувь")
     kb.row("Аксессуары", "Детские товары")
     kb.row("Электроника", "Красота и здоровье")
     kb.row("Для дома и дачи", "Авто и запчасти")
     kb.row("Спецтехника", "Другое")
-    kb.row("🌍 Любая категория")
-    kb.row("⬅️ К фильтрам")
+    kb.row("❌ Отмена")
     return kb
 
 
@@ -635,49 +622,6 @@ def replace_photo_step_kb(photo_count: int = 0):
     return kb
 
 
-def start_create_flow(chat_id: int):
-    pending_create[chat_id] = {
-        "step": "title",
-        "data": {
-            "photos": []
-        }
-    }
-    bot.send_message(
-        chat_id,
-        "➕ Добавление объявления\n\nНапиши название вещи:",
-        reply_markup=cancel_kb()
-    )
-
-
-def create_preview_text(data: dict) -> str:
-    price = data.get("price", 0)
-    photos_count = len(data.get("photos", []))
-    text = "✅ Объявление создано:\n\n"
-    text += f"🧥 {data.get('title', '')}\n"
-    text += "🟢 Бесплатно\n" if price == 0 else f"💰 {price} ₽\n"
-    text += f"📍 {data.get('city', '')}\n"
-    text += f"📦 {data.get('category', '')}\n"
-    text += f"📸 Фото: {photos_count}"
-    return text
-
-
-def finish_create(chat_id: int):
-    data = pending_create[chat_id]["data"]
-    item_id = add_item(
-        title=data["title"],
-        price=data["price"],
-        city=data["city"],
-        category=data["category"],
-        owner_tg=chat_id,
-    )
-    add_item_photos(item_id, data.get("photos", []))
-    pending_create.pop(chat_id, None)
-    bot.send_message(chat_id, create_preview_text(data), reply_markup=main_menu())
-    return item_id
-
-# =========================
-# UI
-# =========================
 def main_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     kb.row("🔎 Смотреть", "➕ Добавить")
@@ -717,8 +661,10 @@ def city_menu():
 def category_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     kb.row("Одежда", "Обувь")
-    kb.row("Техника", "Дом")
-    kb.row("Детское", "Другое")
+    kb.row("Аксессуары", "Детские товары")
+    kb.row("Электроника", "Красота и здоровье")
+    kb.row("Для дома и дачи", "Авто и запчасти")
+    kb.row("Спецтехника", "Другое")
     kb.row("🌍 Любая категория")
     kb.row("⬅️ К фильтрам")
     return kb
@@ -738,12 +684,13 @@ def show_filters_menu(chat_id: int, notice: Optional[str] = None):
         text = f"{notice}\n\n{text}"
     bot.send_message(chat_id, text, reply_markup=filters_menu())
 
-
+# =========================
+# CARDS
+# =========================
 def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
     viewer_user_id = get_user_id(viewer_tg)
     likes_count = get_likes_count(item_id)
-    has_user_like = has_like(viewer_user_id, item_id)
-    like_text = f"💔 Убрать лайк ({likes_count})" if has_user_like else f"❤️ Лайк ({likes_count})"
+    like_text = f"💔 Убрать лайк ({likes_count})" if has_like(viewer_user_id, item_id) else f"❤️ Лайк ({likes_count})"
 
     photos = get_item_photos(item_id)
     kb = types.InlineKeyboardMarkup()
@@ -832,13 +779,13 @@ def show_item(chat_id: int, item, count_view: bool = True, mode: str = "feed"):
     state = get_view_state(chat_id)
     photos = get_item_photos(item_id)
     photo_idx = state.get("photo_idx", 0)
+
     if photos:
         photo_idx = min(photo_idx, len(photos) - 1)
     else:
         photo_idx = 0
 
     set_view_state(chat_id, item_id, mode=mode, photo_idx=photo_idx)
-
     text = item_to_text(fresh_item, photo_idx)
     reply_markup = build_card_keyboard(item_id, chat_id, owner_tg)
 
@@ -894,6 +841,49 @@ def show_archive_item(chat_id: int, item_id: int):
         bot.send_message(chat_id, text, reply_markup=reply_markup)
 
 # =========================
+# CREATE FLOW
+# =========================
+def start_create_flow(chat_id: int):
+    pending_create[chat_id] = {
+        "step": "title",
+        "data": {
+            "photos": []
+        }
+    }
+    bot.send_message(
+        chat_id,
+        "➕ Добавление объявления\n\nНапиши название вещи:",
+        reply_markup=cancel_kb()
+    )
+
+
+def create_preview_text(data: dict) -> str:
+    price = data.get("price", 0)
+    photos_count = len(data.get("photos", []))
+    text = "✅ Объявление создано:\n\n"
+    text += f"🧥 {data.get('title', '')}\n"
+    text += "🟢 Бесплатно\n" if price == 0 else f"💰 {price} ₽\n"
+    text += f"📍 {data.get('city', '')}\n"
+    text += f"📦 {data.get('category', '')}\n"
+    text += f"📸 Фото: {photos_count}"
+    return text
+
+
+def finish_create(chat_id: int):
+    data = pending_create[chat_id]["data"]
+    item_id = add_item(
+        title=data["title"],
+        price=data["price"],
+        city=data["city"],
+        category=data["category"],
+        owner_tg=chat_id,
+    )
+    add_item_photos(item_id, data.get("photos", []))
+    pending_create.pop(chat_id, None)
+    bot.send_message(chat_id, create_preview_text(data), reply_markup=main_menu())
+    return item_id
+
+# =========================
 # COMMANDS
 # =========================
 @bot.message_handler(commands=["start"])
@@ -930,6 +920,7 @@ def start(message):
         reply_markup=main_menu()
     )
 
+
 @bot.message_handler(commands=["add"])
 def add_cmd(message):
     chat_id = message.chat.id
@@ -965,7 +956,7 @@ def watch_items(message):
     items = get_filtered_items(chat_id)
 
     if not items:
-        bot.send_message(chat_id, "По текущим фильтрам объявлений нет 😔")
+        bot.send_message(chat_id, "По текущим фильтрам объявлений нет 😔", reply_markup=main_menu())
         return
 
     user_index[chat_id] = 0
@@ -1220,7 +1211,7 @@ def back_to_filters(message):
     show_filters_menu(message.chat.id)
 
 # =========================
-# CREATE FLOW
+# CREATE FLOW HANDLERS
 # =========================
 @bot.message_handler(func=lambda m: m.text == "❌ Отмена" and m.chat.id in pending_create)
 def cancel_create(message):
@@ -1295,7 +1286,9 @@ def create_finish_handler(message):
     item_id = finish_create(message.chat.id)
     show_my_item(message.chat.id, item_id)
 
-
+# =========================
+# PHOTO
+# =========================
 @bot.message_handler(content_types=['photo'])
 def photo_handler(message):
     chat_id = message.chat.id
@@ -1346,7 +1339,9 @@ def photo_handler(message):
             )
         return
 
-
+# =========================
+# EDIT / REPLACE
+# =========================
 @bot.message_handler(func=lambda m: m.chat.id in pending_edit)
 def handle_edit_text(message):
     chat_id = message.chat.id
@@ -1624,7 +1619,7 @@ def callback_handler(call):
         return
 
 # =========================
-# SAFE POLLING
+# RUN
 # =========================
 def run_bot():
     print("=== BOT STARTING ===", flush=True)
