@@ -107,7 +107,18 @@ view_state = {}               # chat_id -> {"item_id": int, "mode": str, "photo_
 # CONSTANTS
 # =========================
 POPULAR_CITIES = ["Москва", "СПб", "Казань", "Екатеринбург"]
-CATEGORIES = ["Одежда", "Обувь", "Техника", "Дом", "Детское", "Другое"]
+CATEGORIES = [
+    "Одежда",
+    "Обувь",
+    "Аксессуары",
+    "Детские товары",
+    "Электроника",
+    "Красота и здоровье",
+    "Для дома и дачи",
+    "Авто и запчасти",
+    "Спецтехника",
+    "Другое"
+]
 BUMP_COOLDOWN_SECONDS = 12 * 60 * 60
 MAX_PHOTOS_PER_ITEM = 5
 
@@ -594,12 +605,15 @@ def cancel_kb():
     return kb
 
 
-def category_pick_kb():
+def category_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     kb.row("Одежда", "Обувь")
-    kb.row("Техника", "Дом")
-    kb.row("Детское", "Другое")
-    kb.row("❌ Отмена")
+    kb.row("Аксессуары", "Детские товары")
+    kb.row("Электроника", "Красота и здоровье")
+    kb.row("Для дома и дачи", "Авто и запчасти")
+    kb.row("Спецтехника", "Другое")
+    kb.row("🌍 Любая категория")
+    kb.row("⬅️ К фильтрам")
     return kb
 
 
