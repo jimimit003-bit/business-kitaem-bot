@@ -571,3 +571,402 @@ def set_view_state(chat_id: int, item_id: int, mode: str = "feed", photo_idx: in
 
 def get_view_state(chat_id: int):
     return view_state.get(chat_id, {"item_id": None, "mode": "feed", "photo_idx": 0})
+def build_share_text(item_id: int) -> str:
+    item = get_item_by_id(item_id)
+    if not item:
+        return "Объявление не найдено"
+
+    title = item[1]
+    price = item[2]
+    city = item[3]
+    category = item[4]
+    price_text = "Бесплатно" if price == 0 else f"{price} ₽"
+    username = bot.get_me().username
+
+    return (
+        "📍 Поделиться объявлением\n\n"
+        f"🧥 {title}\n"
+        f"💰 {price_text}\n"
+        f"📍 {city}\n"
+        f"📦 {category}\n\n"
+        "Открыть в боте:\n"
+        f"https://t.me/{username}?start=item_{item_id}"
+    )
+
+# =========================
+# KEYBOARDS
+# =========================
+def cancel_kb():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.row("❌ Отмена")
+    return kb
+
+
+def category_pick_kb():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.row("Одежда", "Обувь")
+    kb.row("Аксессуары", "Детские товары")
+    kb.row("Электроника", "Красота и здоровье")
+    kb.row("Для дома и дачи", "Авто и запчасти")
+    kb.row("Спецтехника", "Другое")
+    kb.row("❌ Отмена")
+    return kb
+
+
+def photo_step_kb(photo_count: int = 0):
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    if photo_count == 0:
+        kb.row("✅ Готово без фото")
+    else:
+        kb.row("✅ Опубликовать")
+    kb.row("❌ Отмена")
+    return kb
+
+
+def replace_photo_step_kb(photo_count: int = 0):
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    if photo_count > 0:
+        kb.row("✅ Сохранить фото")
+    kb.row("❌ Отмена замены фото")
+    return kb
+
+
+def main_menu():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.row("🔎 Смотреть", "➕ Добавить")
+    kb.row("⚙️ Фильтры", "❤️ Избранное")
+    kb.row("🏠 Меню")
+    return kb
+
+
+def submenu_menu():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.row("📦 Мои объявления", "🗂 Архив")
+    kb.row("📊 Статистика", "🎁 Пригласить")
+    kb.row("🆘 Помощь / правила", "🔥 Популярное")
+    kb.row("🔍 Поиск")
+    kb.row("⬅️ Назад")
+    return kb
+
+
+def filters_menu():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.row("📍 Город", "📦 Категория")
+    kb.row("💰 Цена", "🔎 Показать")
+    kb.row("♻️ Сбросить фильтры")
+    kb.row("⬅️ Назад")
+    return kb
+
+
+def city_menu():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.row("Москва", "СПб")
+    kb.row("Казань", "Екатеринбург")
+    kb.row("🌍 Любой город")
+    kb.row("⬅️ К фильтрам")
+    return kb
+
+
+def category_menu():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.row("Одежда", "Обувь")
+    kb.row("Аксессуары", "Детские товары")
+    kb.row("Электроника", "Красота и здоровье")
+    kb.row("Для дома и дачи", "Авто и запчасти")
+    kb.row("Спецтехника", "Другое")
+    kb.row("🌍 Любая категория")
+    kb.row("⬅️ К фильтрам")
+    return kb
+
+
+def price_menu():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.row("🟢 Бесплатно", "🟡 До 400 ₽")
+    kb.row("⚪ Любая цена")
+    kb.row("⬅️ К фильтрам")
+    return kb
+
+
+def show_filters_menu(chat_id: int, notice: Optional[str] = None):
+    text = filters_status_text(chat_id)
+    if notice:
+        text = f"{notice}\n\n{text}"
+    bot.send_message(chat_id, text, reply_markup=filters_menu())
+
+# =========================
+# CARDS
+# =========================
+def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
+    viewer_user_id = get_user_id(viewer_tg)
+    likes_count = get_likes_count(item_id)
+    like_text = f"💔 Убрать лайк ({likes_count})" if has_like(viewer_user_id, item_id) else f"❤️ Лайк ({likes_count})"
+
+    photos = get_item_photos(item_id)
+    kb = types.InlineKeyboardMarkup()
+
+    if len(photos) > 1:
+        kb.row(
+            types.InlineKeyboardButton("⬅️ Фото", callback_data=f"prevphoto_{item_id}"),
+            types.InlineKeyboardButton("Фото ➡️", callback_data=f"nextphoto_{item_id}")
+        )
+
+    kb.row(
+        types.InlineKeyboardButton("➡️ Следующее", callback_data="next"),
+        types.InlineKeyboardButton(like_text, callback_data=f"like_{item_id}")
+    )
+
+    kb.row(
+        types.InlineKeyboardButton("❤️ В избранное", callback_data=f"fav_{item_id}"),
+        types.InlineKeyboardButton("💬 Написать владельцу", url=f"tg://user?id={owner_tg}")
+    )
+
+    kb.row(
+        types.InlineKeyboardButton("📍 Поделиться объявлением", callback_data=f"share_{item_id}")
+    )
+
+    if owner_tg == viewer_tg:
+        kb.row(
+            types.InlineKeyboardButton("✅ Отдано", callback_data=f"taken_{item_id}"),
+            types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}")
+        )
+        kb.row(
+            types.InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{item_id}"),
+            types.InlineKeyboardButton("📷 Заменить фото", callback_data=f"replacephoto_{item_id}")
+        )
+        kb.row(
+            types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
+        )
+    else:
+        kb.row(
+            types.InlineKeyboardButton("✅ Забрать", callback_data=f"take_{item_id}"),
+            types.InlineKeyboardButton("⚠️ Жалоба", callback_data=f"report_{item_id}")
+        )
+
+    return kb
+
+
+def build_archive_card_keyboard(item_id: int):
+    kb = types.InlineKeyboardMarkup()
+    kb.row(
+        types.InlineKeyboardButton("♻️ Вернуть", callback_data=f"restore_{item_id}"),
+        types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
+    )
+    return kb
+
+
+def show_item(chat_id: int, item, count_view: bool = True, mode: str = "feed", message_id: Optional[int] = None):
+    if not item:
+        total_active = get_total_active_items()
+        if total_active == 0:
+            bot.send_message(
+                chat_id,
+                "Пока вообще нет активных объявлений 😕\n\nДобавь первое через ➕ Добавить",
+                reply_markup=main_menu()
+            )
+        else:
+            bot.send_message(
+                chat_id,
+                "По текущим фильтрам объявлений нет 😕\n\nПопробуй ♻️ Сбросить фильтры",
+                reply_markup=main_menu()
+            )
+        return
+
+    item_id, title, price, city, category, owner_tg, views, is_taken, bump_count, last_bump_at, created_at = item
+
+    if count_view:
+        add_view(item_id)
+
+    fresh_item = get_item_by_id(item_id)
+    if not fresh_item:
+        bot.send_message(chat_id, "Объявление уже недоступно", reply_markup=main_menu())
+        return
+
+    if fresh_item[7] == 1:
+        bot.send_message(chat_id, "Это объявление уже в архиве", reply_markup=submenu_menu())
+        return
+
+    state = get_view_state(chat_id)
+    photos = get_item_photos(item_id)
+    photo_idx = state.get("photo_idx", 0)
+
+    if photos:
+        photo_idx = min(photo_idx, len(photos) - 1)
+    else:
+        photo_idx = 0
+
+    set_view_state(chat_id, item_id, mode=mode, photo_idx=photo_idx)
+    text = item_to_text(fresh_item, photo_idx)
+    reply_markup = build_card_keyboard(item_id, chat_id, owner_tg)
+
+    if photos:
+        if message_id:
+            try:
+                media = types.InputMediaPhoto(photos[photo_idx], caption=text)
+                bot.edit_message_media(
+                    media=media,
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    reply_markup=reply_markup
+                )
+                return
+            except Exception:
+                pass
+
+        try:
+            bot.send_photo(chat_id, photos[photo_idx], caption=text, reply_markup=reply_markup)
+            return
+        except ApiTelegramException:
+            pass
+
+    if message_id:
+        try:
+            bot.edit_message_text(
+                text=text,
+                chat_id=chat_id,
+                message_id=message_id,
+                reply_markup=reply_markup
+            )
+            return
+        except Exception:
+            pass
+
+    bot.send_message(chat_id, text, reply_markup=reply_markup)
+
+
+def show_my_item(chat_id: int, item_id: int):
+    item = get_item_by_id(item_id)
+    if not item:
+        bot.send_message(chat_id, "Объявление не найдено", reply_markup=submenu_menu())
+        return
+
+    if item[5] != chat_id:
+        bot.send_message(chat_id, "Это не твоё объявление", reply_markup=submenu_menu())
+        return
+
+    if item[7] == 1:
+        bot.send_message(chat_id, "Это объявление уже в архиве", reply_markup=submenu_menu())
+        return
+
+    set_view_state(chat_id, item_id, mode="my", photo_idx=0)
+    show_item(chat_id, item, count_view=False, mode="my")
+
+
+def show_archive_item(chat_id: int, item_id: int):
+    item = get_item_by_id(item_id)
+    if not item:
+        bot.send_message(chat_id, "Архивное объявление не найдено", reply_markup=submenu_menu())
+        return
+
+    if item[5] != chat_id:
+        bot.send_message(chat_id, "Это не твоё объявление", reply_markup=submenu_menu())
+        return
+
+    if item[7] == 0:
+        bot.send_message(chat_id, "Это объявление уже активно", reply_markup=submenu_menu())
+        return
+
+    photos = get_item_photos(item_id)
+    text = item_to_text(item, 0) + "\n\n🗂 Статус: в архиве"
+    reply_markup = build_archive_card_keyboard(item[0])
+
+    if photos:
+        bot.send_photo(chat_id, photos[0], caption=text, reply_markup=reply_markup)
+    else:
+        bot.send_message(chat_id, text, reply_markup=reply_markup)
+
+# =========================
+# CREATE / EDIT FLOW
+# =========================
+def start_create_flow(chat_id: int):
+    pending_create[chat_id] = {
+        "step": "title",
+        "mode": "create",
+        "data": {
+            "photos": []
+        }
+    }
+    bot.send_message(
+        chat_id,
+        "➕ Добавление объявления\n\nНапиши название вещи:",
+        reply_markup=cancel_kb()
+    )
+
+
+def start_edit_flow(chat_id: int, item_id: int):
+    item = get_item_by_id(item_id)
+    if not item:
+        bot.send_message(chat_id, "Объявление не найдено", reply_markup=main_menu())
+        return
+
+    if item[5] != chat_id:
+        bot.send_message(chat_id, "Это не твоё объявление", reply_markup=main_menu())
+        return
+
+    pending_create[chat_id] = {
+        "step": "title",
+        "mode": "edit",
+        "edit_item_id": item_id,
+        "data": {
+            "title": item[1],
+            "price": item[2],
+            "city": item[3],
+            "category": item[4],
+            "photos": get_item_photos(item_id)
+        }
+    }
+
+    bot.send_message(
+        chat_id,
+        f"✏️ Редактирование объявления\n\nТекущее название: {item[1]}\n\nНапиши новое название:",
+        reply_markup=cancel_kb()
+    )
+
+
+def create_preview_text(data: dict) -> str:
+    price = data.get("price", 0)
+    photos_count = len(data.get("photos", []))
+    text = "✅ Объявление сохранено:\n\n"
+    text += f"🧥 {data.get('title', '')}\n"
+    text += "🟢 Бесплатно\n" if price == 0 else f"💰 {price} ₽\n"
+    text += f"📍 {data.get('city', '')}\n"
+    text += f"📦 {data.get('category', '')}\n"
+    text += f"📸 Фото: {photos_count}"
+    return text
+
+
+def finish_create(chat_id: int):
+    flow = pending_create[chat_id]
+    data = flow["data"]
+
+    if flow["mode"] == "edit":
+        item_id = flow["edit_item_id"]
+        ok = update_item(
+            item_id=item_id,
+            owner_tg=chat_id,
+            title=data["title"],
+            price=data["price"],
+            city=data["city"],
+            category=data["category"]
+        )
+        if ok:
+            replace_item_photos(item_id, data.get("photos", []))
+            pending_create.pop(chat_id, None)
+            bot.send_message(chat_id, "✅ Объявление обновлено", reply_markup=main_menu())
+            show_my_item(chat_id, item_id)
+            return item_id
+        else:
+            bot.send_message(chat_id, "Не удалось обновить объявление", reply_markup=main_menu())
+            pending_create.pop(chat_id, None)
+            return None
+
+    item_id = add_item(
+        title=data["title"],
+        price=data["price"],
+        city=data["city"],
+        category=data["category"],
+        owner_tg=chat_id,
+    )
+    add_item_photos(item_id, data.get("photos", []))
+    pending_create.pop(chat_id, None)
+    bot.send_message(chat_id, create_preview_text(data), reply_markup=main_menu())
+    return item_id
