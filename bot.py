@@ -401,10 +401,25 @@ def bump_item(item_id: int, owner_tg: int):
     photos = get_item_photos(item_id)
     title, price, city, category, subcategory, owner_tg, views, is_taken, bump_count, created_at = row
 
+    # сохраняем связанные данные
+    cursor.execute("SELECT user_id FROM likes WHERE item_id = ?", (item_id,))
+    likes_rows = cursor.fetchall()
+
+    cursor.execute("SELECT user_id FROM favorites WHERE item_id = ?", (item_id,))
+    fav_rows = cursor.fetchall()
+
+    cursor.execute("SELECT reporter_tg, reason, created_at FROM reports WHERE item_id = ?", (item_id,))
+    report_rows = cursor.fetchall()
+
+    # удаляем старые фото и объявление
     cursor.execute("DELETE FROM item_photos WHERE item_id = ?", (item_id,))
+    cursor.execute("DELETE FROM likes WHERE item_id = ?", (item_id,))
+    cursor.execute("DELETE FROM favorites WHERE item_id = ?", (item_id,))
+    cursor.execute("DELETE FROM reports WHERE item_id = ?", (item_id,))
     cursor.execute("DELETE FROM items WHERE id = ?", (item_id,))
     conn.commit()
 
+    # создаём новое объявление
     cursor.execute("""
         INSERT INTO items (
             title, price, city, category, subcategory, owner_tg,
@@ -418,7 +433,32 @@ def bump_item(item_id: int, owner_tg: int):
     conn.commit()
 
     new_item_id = cursor.lastrowid
+
+    # возвращаем фото
     add_item_photos(new_item_id, photos)
+
+    # переносим лайки
+    for like_row in likes_rows:
+        cursor.execute(
+            "INSERT OR IGNORE INTO likes (user_id, item_id) VALUES (?, ?)",
+            (like_row[0], new_item_id)
+        )
+
+    # переносим избранное
+    for fav_row in fav_rows:
+        cursor.execute(
+            "INSERT OR IGNORE INTO favorites (user_id, item_id) VALUES (?, ?)",
+            (fav_row[0], new_item_id)
+        )
+
+    # переносим жалобы
+    for reporter_tg, reason, created_at_value in report_rows:
+        cursor.execute("""
+            INSERT INTO reports (reporter_tg, item_id, reason, created_at)
+            VALUES (?, ?, ?, ?)
+        """, (reporter_tg, new_item_id, reason, created_at_value))
+
+    conn.commit()
     return new_item_id
 
 
