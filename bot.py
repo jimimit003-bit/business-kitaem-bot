@@ -658,16 +658,25 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
 
     kb = types.InlineKeyboardMarkup()
 
+    # фото листание
+    kb.row(
+        types.InlineKeyboardButton("⬅️ Фото", callback_data=f"ph_left_{item_id}"),
+        types.InlineKeyboardButton("Фото ➡️", callback_data=f"ph_right_{item_id}")
+    )
+
+    # навигация
     kb.row(
         types.InlineKeyboardButton("➡️ Следующее", callback_data="next"),
         types.InlineKeyboardButton(like_text, callback_data=f"like_{item_id}")
     )
 
+    # избранное / чат
     kb.row(
         types.InlineKeyboardButton("❤️ В избранное", callback_data=f"fav_{item_id}"),
-        types.InlineKeyboardButton("💬 Написать владельцу", url=f"tg://user?id={owner_tg}")
+        types.InlineKeyboardButton("💬 Написать", url=f"tg://user?id={owner_tg}")
     )
 
+    # поделиться
     kb.row(
         types.InlineKeyboardButton("📍 Поделиться объявлением", callback_data=f"share_{item_id}")
     )
@@ -680,13 +689,17 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
         )
 
         kb.row(
+            types.InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{item_id}"),
+            types.InlineKeyboardButton("📷 Заменить фото", callback_data=f"replacephoto_{item_id}")
+        )
+
+        kb.row(
             types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
         )
 
     else:
 
         kb.row(
-            types.InlineKeyboardButton("✅ Забрать", callback_data=f"take_{item_id}"),
             types.InlineKeyboardButton("⚠️ Жалоба", callback_data=f"report_{item_id}")
         )
 
