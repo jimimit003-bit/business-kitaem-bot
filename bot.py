@@ -758,10 +758,12 @@ def replace_photo_step_kb(photo_count: int = 0):
 
 def filters_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+
     kb.row("📍 Город", "📦 Категория")
-    kb.row("📂 Подкатегория", "💰 Цена")
-    kb.row("🔎 Показать", "♻️ Сбросить фильтры")
+    kb.row("💰 Цена", "📂 Подкатегория")
+    kb.row("♻️ Сбросить фильтры", "🔎 Показать")
     kb.row("⬅️ Назад")
+
     return kb
 
 
