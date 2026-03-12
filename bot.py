@@ -32,6 +32,15 @@ CATEGORIES: Dict[str, List[str]] = {
     "Другое": ["Разное"]
 }
 
+BROWSE_CATEGORY_BUTTONS = {
+    "👕 Одежда": "Одежда",
+    "👟 Обувь": "Обувь",
+    "📱 Электроника": "Электроника",
+    "🧸 Детям": "Детские товары",
+    "🏠 Дом и дача": "Для дома и дачи",
+    "🚗 Авто": "Авто и запчасти",
+}
+
 REPORT_REASONS = [
     "Спам",
     "Мошенничество",
@@ -121,13 +130,14 @@ CREATE TABLE IF NOT EXISTS reports (
 
 conn.commit()
 
-# Мягкая миграция для старой базы
+
 def ensure_column(table_name: str, column_name: str, column_def: str):
     cursor.execute(f"PRAGMA table_info({table_name})")
     columns = [row[1] for row in cursor.fetchall()]
     if column_name not in columns:
         cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_def}")
         conn.commit()
+
 
 ensure_column("items", "subcategory", "TEXT NOT NULL DEFAULT ''")
 
@@ -181,6 +191,7 @@ def get_user_id(telegram_id: int) -> int:
         (telegram_id,)
     )
     conn.commit()
+
     cursor.execute(
         "SELECT id FROM users WHERE telegram_id = ?",
         (telegram_id,)
@@ -192,6 +203,7 @@ def get_user_id(telegram_id: int) -> int:
 def add_referral(inviter_tg: int, invited_tg: int):
     if inviter_tg == invited_tg:
         return
+
     cursor.execute(
         "INSERT OR IGNORE INTO referrals (inviter_tg, invited_tg) VALUES (?, ?)",
         (inviter_tg, invited_tg)
@@ -298,7 +310,30 @@ def get_filtered_items(chat_id: int):
     if f["price"] == "free":
         query += " AND price = 0"
     elif f["price"] == "under400":
-        query += " AND price >= 0 AND price <= 400"
+        query += " AND price > 0 AND price <= 400"
+
+    query += " ORDER BY id DESC"
+    cursor.execute(query, tuple(params))
+    return cursor.fetchall()
+
+
+def get_items_for_browse(mode: str, category: Optional[str] = None):
+    query = """
+        SELECT id, title, price, city, category, subcategory, owner_tg,
+               views, is_taken, bump_count, last_bump_at, created_at
+        FROM items
+        WHERE is_taken = 0
+    """
+    params = []
+
+    if mode == "free":
+        query += " AND price = 0"
+    elif mode == "cheap":
+        query += " AND price > 0 AND price <= 400"
+
+    if category:
+        query += " AND category = ?"
+        params.append(category)
 
     query += " ORDER BY id DESC"
     cursor.execute(query, tuple(params))
@@ -401,7 +436,6 @@ def bump_item(item_id: int, owner_tg: int):
     photos = get_item_photos(item_id)
     title, price, city, category, subcategory, owner_tg, views, is_taken, bump_count, created_at = row
 
-    # сохраняем связанные данные
     cursor.execute("SELECT user_id FROM likes WHERE item_id = ?", (item_id,))
     likes_rows = cursor.fetchall()
 
@@ -411,7 +445,6 @@ def bump_item(item_id: int, owner_tg: int):
     cursor.execute("SELECT reporter_tg, reason, created_at FROM reports WHERE item_id = ?", (item_id,))
     report_rows = cursor.fetchall()
 
-    # удаляем старые фото и объявление
     cursor.execute("DELETE FROM item_photos WHERE item_id = ?", (item_id,))
     cursor.execute("DELETE FROM likes WHERE item_id = ?", (item_id,))
     cursor.execute("DELETE FROM favorites WHERE item_id = ?", (item_id,))
@@ -419,7 +452,6 @@ def bump_item(item_id: int, owner_tg: int):
     cursor.execute("DELETE FROM items WHERE id = ?", (item_id,))
     conn.commit()
 
-    # создаём новое объявление
     cursor.execute("""
         INSERT INTO items (
             title, price, city, category, subcategory, owner_tg,
@@ -433,25 +465,20 @@ def bump_item(item_id: int, owner_tg: int):
     conn.commit()
 
     new_item_id = cursor.lastrowid
-
-    # возвращаем фото
     add_item_photos(new_item_id, photos)
 
-    # переносим лайки
     for like_row in likes_rows:
         cursor.execute(
             "INSERT OR IGNORE INTO likes (user_id, item_id) VALUES (?, ?)",
             (like_row[0], new_item_id)
         )
 
-    # переносим избранное
     for fav_row in fav_rows:
         cursor.execute(
             "INSERT OR IGNORE INTO favorites (user_id, item_id) VALUES (?, ?)",
             (fav_row[0], new_item_id)
         )
 
-    # переносим жалобы
     for reporter_tg, reason, created_at_value in report_rows:
         cursor.execute("""
             INSERT INTO reports (reporter_tg, item_id, reason, created_at)
@@ -536,7 +563,7 @@ def search_items(chat_id: int, query_text: str):
     if f["price"] == "free":
         query += " AND price = 0"
     elif f["price"] == "under400":
-        query += " AND price <= 400"
+        query += " AND price > 0 AND price <= 400"
 
     query += " ORDER BY id DESC"
     cursor.execute(query, tuple(params))
@@ -692,18 +719,29 @@ def get_view_state(chat_id: int):
 # =========================
 def main_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.row("🔎 Смотреть", "➕ Добавить")
-    kb.row("⚙️ Фильтры", "❤️ Избранное")
-    kb.row("🏠 Меню")
+    kb.row("🔎 Смотреть все", "✍️ Поиск по названию")
+    kb.row("⚙️ Фильтры", "➕ Добавить")
+    kb.row("🏠 Домой")
     return kb
 
 
 def submenu_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     kb.row("📦 Мои объявления", "🗂 Архив")
-    kb.row("📊 Статистика", "🎁 Пригласить")
-    kb.row("👤 Профиль", "🆘 Помощь / правила")
-    kb.row("🔥 Популярное", "🔍 Поиск")
+    kb.row("🔥 Популярное", "❤️ Избранное")
+    kb.row("📊 Статистика", "👤 Профиль")
+    kb.row("🆘 Помощь", "🎁 Пригласить")
+    kb.row("⬅️ Назад")
+    return kb
+
+
+def browse_menu():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.row("📦 Все объявления")
+    kb.row("🎁 Бесплатно", "💸 За копейки")
+    kb.row("👕 Одежда", "👟 Обувь")
+    kb.row("📱 Электроника", "🧸 Детям")
+    kb.row("🏠 Дом и дача", "🚗 Авто")
     kb.row("⬅️ Назад")
     return kb
 
@@ -758,12 +796,10 @@ def replace_photo_step_kb(photo_count: int = 0):
 
 def filters_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-
     kb.row("📍 Город", "📦 Категория")
     kb.row("💰 Цена", "📂 Подкатегория")
     kb.row("♻️ Сбросить фильтры", "🔎 Показать")
     kb.row("⬅️ Назад")
-
     return kb
 
 
@@ -855,7 +891,7 @@ def show_filters_menu(chat_id: int, notice: Optional[str] = None):
 
 
 # =========================
-# CARD KEYBOARD / SHOW ITEM
+# CARD / SHOW ITEM
 # =========================
 def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
     viewer_user_id = get_user_id(viewer_tg)
@@ -922,7 +958,7 @@ def show_item(chat_id: int, item, count_view: bool = True, mode: str = "feed", m
         else:
             bot.send_message(
                 chat_id,
-                "По текущим фильтрам объявлений нет 😕\n\nПопробуй ♻️ Сбросить фильтры",
+                "По текущим условиям объявлений нет 😕",
                 reply_markup=main_menu()
             )
         return
@@ -1033,7 +1069,7 @@ def show_archive_item(chat_id: int, item_id: int):
 
 
 # =========================
-# CREATE / EDIT FLOW
+# CREATE / EDIT
 # =========================
 def start_create_flow(chat_id: int):
     pending_create[chat_id] = {
@@ -1157,7 +1193,7 @@ def start(message):
 
     bot.send_message(
         chat_id,
-        "Добро пожаловать в Даром 🎁\n\nЗдесь можно отдавать вещи бесплатно.",
+        "Добро пожаловать в Даром 🎁\n\nЗдесь можно находить вещи бесплатно и за копейки.",
         reply_markup=main_menu()
     )
 
@@ -1165,23 +1201,91 @@ def start(message):
 # =========================
 # MAIN MENU
 # =========================
-@bot.message_handler(func=lambda m: m.text == "🔎 Смотреть")
-def watch_items(message):
+@bot.message_handler(func=lambda m: m.text == "🏠 Домой")
+def home_menu(message):
+    bot.send_message(message.chat.id, "Главное меню:", reply_markup=main_menu())
+
+
+@bot.message_handler(func=lambda m: m.text == "🔎 Смотреть все")
+def open_browse_menu(message):
+    bot.send_message(
+        message.chat.id,
+        "Выберите категорию или смотрите все объявления",
+        reply_markup=browse_menu()
+    )
+
+
+@bot.message_handler(func=lambda m: m.text == "📦 Все объявления")
+def browse_all_items(message):
     chat_id = message.chat.id
-    items = get_filtered_items(chat_id)
+    items = get_items_for_browse("all")
 
     if not items:
-        bot.send_message(chat_id, "По текущим фильтрам объявлений нет 😔", reply_markup=main_menu())
+        bot.send_message(chat_id, "Сейчас нет активных объявлений 😔", reply_markup=browse_menu())
         return
 
     user_index[chat_id] = 0
-    set_view_state(chat_id, items[0][0], "feed", 0)
-    show_item(chat_id, items[0])
+    set_view_state(chat_id, items[0][0], mode="browse_all", photo_idx=0)
+    show_item(chat_id, items[0], mode="browse_all")
+
+
+@bot.message_handler(func=lambda m: m.text == "🎁 Бесплатно")
+def browse_free_items(message):
+    chat_id = message.chat.id
+    items = get_items_for_browse("free")
+
+    if not items:
+        bot.send_message(chat_id, "Бесплатных объявлений пока нет 😔", reply_markup=browse_menu())
+        return
+
+    user_index[chat_id] = 0
+    set_view_state(chat_id, items[0][0], mode="browse_free", photo_idx=0)
+    show_item(chat_id, items[0], mode="browse_free")
+
+
+@bot.message_handler(func=lambda m: m.text == "💸 За копейки")
+def browse_cheap_items(message):
+    chat_id = message.chat.id
+    items = get_items_for_browse("cheap")
+
+    if not items:
+        bot.send_message(chat_id, "Объявлений за копейки пока нет 😔", reply_markup=browse_menu())
+        return
+
+    user_index[chat_id] = 0
+    set_view_state(chat_id, items[0][0], mode="browse_cheap", photo_idx=0)
+    show_item(chat_id, items[0], mode="browse_cheap")
+
+
+@bot.message_handler(func=lambda m: m.text in BROWSE_CATEGORY_BUTTONS)
+def browse_category_items(message):
+    chat_id = message.chat.id
+    category = BROWSE_CATEGORY_BUTTONS[message.text]
+    items = get_items_for_browse("all", category=category)
+
+    if not items:
+        bot.send_message(chat_id, f"В категории «{category}» пока нет объявлений 😔", reply_markup=browse_menu())
+        return
+
+    user_index[chat_id] = 0
+    set_view_state(chat_id, items[0][0], mode=f"browse_cat:{category}", photo_idx=0)
+    show_item(chat_id, items[0], mode=f"browse_cat:{category}")
+
+
+@bot.message_handler(func=lambda m: m.text == "✍️ Поиск по названию")
+def open_search(message):
+    pending_search.add(message.chat.id)
+    bot.send_message(message.chat.id, "Напиши слово для поиска.\nНапример: куртка", reply_markup=submenu_menu())
 
 
 @bot.message_handler(func=lambda m: m.text == "➕ Добавить")
 def add_menu(message):
     start_create_flow(message.chat.id)
+
+
+@bot.message_handler(func=lambda m: m.text == "⚙️ Фильтры")
+def filters(message):
+    show_filters_menu(message.chat.id)
 
 
 @bot.message_handler(func=lambda m: m.text == "❤️ Избранное")
@@ -1210,19 +1314,9 @@ def favorites_menu(message):
     bot.send_message(chat_id, "❤️ Избранное:", reply_markup=kb)
 
 
-@bot.message_handler(func=lambda m: m.text == "⚙️ Фильтры")
-def filters(message):
-    show_filters_menu(message.chat.id)
-
-
-@bot.message_handler(func=lambda m: m.text == "🏠 Меню")
-def menu(message):
-    bot.send_message(message.chat.id, "Дополнительное меню:", reply_markup=submenu_menu())
-
-
 @bot.message_handler(func=lambda m: m.text == "⬅️ Назад")
 def back(message):
-    bot.send_message(message.chat.id, "Главное меню:", reply_markup=main_menu())
+    bot.send_message(message.chat.id, "Дополнительное меню:", reply_markup=submenu_menu())
 
 
 # =========================
@@ -1297,10 +1391,10 @@ def invite_menu(message):
     )
 
 
-@bot.message_handler(func=lambda m: m.text == "🆘 Помощь / правила")
+@bot.message_handler(func=lambda m: m.text == "🆘 Помощь")
 def help_menu(message):
     text = (
-        "🆘 Помощь / правила\n\n"
+        "🆘 Помощь\n\n"
         "1. Размещай реальные вещи\n"
         "2. Не публикуй запрещённые товары\n"
         "3. Будь вежлив\n"
@@ -1326,12 +1420,6 @@ def popular_menu(message):
         kb.row(types.InlineKeyboardButton(f"#{item_id} {title}", callback_data=f"popular_{item_id}"))
 
     bot.send_message(message.chat.id, "🔥 Популярное:", reply_markup=kb)
-
-
-@bot.message_handler(func=lambda m: m.text == "🔍 Поиск")
-def search_menu(message):
-    pending_search.add(message.chat.id)
-    bot.send_message(message.chat.id, "Напиши слово для поиска.\nНапример: куртка", reply_markup=submenu_menu())
 
 
 @bot.message_handler(func=lambda m: m.chat.id in pending_search and m.chat.id not in pending_create)
@@ -1410,8 +1498,8 @@ def show_filtered(message):
         return
 
     user_index[chat_id] = 0
-    set_view_state(chat_id, items[0][0], "feed", 0)
-    show_item(chat_id, items[0])
+    set_view_state(chat_id, items[0][0], "filtered", 0)
+    show_item(chat_id, items[0], mode="filtered")
 
 
 @bot.message_handler(func=lambda m: (m.text in POPULAR_CITIES or m.text == "🌍 Любой город") and m.chat.id not in pending_create)
@@ -1475,7 +1563,7 @@ def back_to_filters(message):
 
 
 # =========================
-# CREATE FLOW
+# CREATE / EDIT FLOW
 # =========================
 @bot.message_handler(func=lambda m: m.text == "❌ Отмена" and m.chat.id in pending_create)
 def cancel_create(message):
@@ -1552,6 +1640,7 @@ def create_category_handler(message):
         return
 
     pending_create[message.chat.id]["data"]["category"] = text
+    pending_create[message.chat.id]["data"]["subcategory"] = ""
     pending_create[message.chat.id]["step"] = "subcategory"
 
     flow = pending_create[message.chat.id]
@@ -1664,7 +1753,23 @@ def callback_handler(call):
     data = call.data
 
     if data == "next":
-        items = get_filtered_items(chat_id)
+        st = get_view_state(chat_id)
+        mode = st.get("mode", "feed")
+
+        if mode == "browse_all":
+            items = get_items_for_browse("all")
+        elif mode == "browse_free":
+            items = get_items_for_browse("free")
+        elif mode == "browse_cheap":
+            items = get_items_for_browse("cheap")
+        elif mode.startswith("browse_cat:"):
+            category = mode.split(":", 1)[1]
+            items = get_items_for_browse("all", category=category)
+        elif mode == "filtered":
+            items = get_filtered_items(chat_id)
+        else:
+            items = get_filtered_items(chat_id)
+
         if not items:
             bot.answer_callback_query(call.id, "Нет объявлений")
             return
@@ -1672,8 +1777,8 @@ def callback_handler(call):
         idx = user_index.get(chat_id, 0)
         idx = (idx + 1) % len(items)
         user_index[chat_id] = idx
-        set_view_state(chat_id, items[idx][0], mode="feed", photo_idx=0)
-        show_item(chat_id, items[idx], message_id=call.message.message_id)
+        set_view_state(chat_id, items[idx][0], mode=mode, photo_idx=0)
+        show_item(chat_id, items[idx], message_id=call.message.message_id, mode=mode)
         bot.answer_callback_query(call.id)
         return
 
