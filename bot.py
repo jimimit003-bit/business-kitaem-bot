@@ -1366,13 +1366,21 @@ def archive_menu_handler(message):
     bot.send_message(chat_id, "🗂 Архив:", reply_markup=kb)
 
 
-@bot.message_handler(func=lambda m: m.text in ["📊 Статистика", "👤 Профиль"])
+@bot.message_handler(func=lambda m: m.text == "👤 Профиль")
+def profile_menu(message):
+    pending_search.discard(message.chat.id)
+    bot.send_message(
+        message.chat.id,
+        "Профиль:",
+        reply_markup=submenu_menu()
+    )
+    
+@bot.message_handler(func=lambda m: m.text == "📊 Статистика")
 def stats_menu(message):
     chat_id = message.chat.id
     pending_search.discard(chat_id)
 
     my_items = get_user_items(chat_id)
-
     total_items = len(my_items)
     active_items = len([item for item in my_items if item[8] == 0])
     archive_items = len([item for item in my_items if item[8] == 1])
@@ -1381,7 +1389,7 @@ def stats_menu(message):
     refs = get_referrals_count(chat_id)
 
     text = (
-        "👤 Профиль\n\n"
+        "📊 Статистика\n\n"
         f"📦 Всего объявлений: {total_items}\n"
         f"🟢 Активных: {active_items}\n"
         f"🗂 В архиве: {archive_items}\n\n"
@@ -1390,12 +1398,7 @@ def stats_menu(message):
         f"👥 Приглашено друзей: {refs}"
     )
 
-    if message.text == "👤 Профиль":
-        bot.send_message(chat_id, text, reply_markup=main_menu())
-    else:
-        bot.send_message(chat_id, text, reply_markup=submenu_menu())
-    
-
+    bot.send_message(chat_id, text, reply_markup=submenu_menu())
 
 @bot.message_handler(func=lambda m: m.text == "🎁 Пригласить")
 def invite_menu(message):
