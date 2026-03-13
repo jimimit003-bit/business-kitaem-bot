@@ -1382,12 +1382,7 @@ def stats_menu(message):
         f"❤️ Лайков: {total_likes}"
     )
     bot.send_message(chat_id, text, reply_markup=submenu_menu())
-
-
-@bot.message_handler(func=lambda m: m.text == "👤 Профиль")
-def profile_menu(message):
-    chat_id = message.chat.id
-    bot.send_message(chat_id, get_user_profile_text(chat_id), reply_markup=submenu_menu())
+    
 
 
 @bot.message_handler(func=lambda m: m.text == "🎁 Пригласить")
