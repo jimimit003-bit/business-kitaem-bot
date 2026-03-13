@@ -1369,6 +1369,8 @@ def archive_menu_handler(message):
 @bot.message_handler(func=lambda m: m.text in ["📊 Статистика", "👤 Профиль"])
 def stats_menu(message):
     chat_id = message.chat.id
+    pending_search.discard(chat_id)
+
     my_items = get_user_items(chat_id)
 
     total_items = len(my_items)
@@ -1379,7 +1381,7 @@ def stats_menu(message):
     refs = get_referrals_count(chat_id)
 
     text = (
-        "👤 Профиль / статистика\n\n"
+        "👤 Профиль\n\n"
         f"📦 Всего объявлений: {total_items}\n"
         f"🟢 Активных: {active_items}\n"
         f"🗂 В архиве: {archive_items}\n\n"
