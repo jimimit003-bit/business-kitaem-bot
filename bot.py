@@ -1908,7 +1908,8 @@ def callback_handler(call):
         )
 
         bot.answer_callback_query(call.id, "Жалоба отправлена администратору")
-
+        return
+        
     if data.startswith("share_"):
         item_id = int(data.split("_")[1])
         bot.send_message(chat_id, build_share_text(item_id), reply_markup=main_menu())
