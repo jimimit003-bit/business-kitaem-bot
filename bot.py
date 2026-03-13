@@ -1899,15 +1899,15 @@ def callback_handler(call):
         return
 
     if call.data.startswith("report_"):
-    item_id = int(call.data.split("_")[1])
+        item_id = int(call.data.split("_")[1])
 
-    bot.send_message(
-        ADMIN_ID,
-        f"🚩 Жалоба на объявление #{item_id}\n"
-        f"От пользователя: {call.from_user.id}"
-    )
+        bot.send_message(
+            ADMIN_ID,
+            f"🚩 Жалоба на объявление #{item_id}\n"
+            f"От пользователя: {call.from_user.id}"
+        )
 
-    bot.answer_callback_query(call.id, "Жалоба отправлена администратору")
+        bot.answer_callback_query(call.id, "Жалоба отправлена администратору")
 
     if data.startswith("share_"):
         item_id = int(data.split("_")[1])
