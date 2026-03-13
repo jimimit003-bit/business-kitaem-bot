@@ -1410,7 +1410,19 @@ def help_menu(message):
         "6. Для добавления объявления нажми ➕ Добавить"
     )
     bot.send_message(message.chat.id, text, reply_markup=submenu_menu())
-
+    
+@bot.message_handler(func=lambda m: m.text == "📜 Правила")
+def rules_menu(message):
+    text = (
+        "📜 Правила\n\n"
+        "1. Размещай только реальные вещи\n"
+        "2. Не публикуй запрещённые товары\n"
+        "3. Не обманывай других пользователей\n"
+        "4. Указывай честную цену и описание\n"
+        "5. Если вещь уже отдана — нажми ✅ Отдано\n"
+        "6. Уважительно общайся с другими"
+    )
+    bot.send_message(message.chat.id, text)
 
 @bot.message_handler(func=lambda m: m.text == "🔥 Популярное")
 def popular_menu(message):
