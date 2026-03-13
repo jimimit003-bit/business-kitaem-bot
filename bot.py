@@ -1205,8 +1205,13 @@ def start(message):
 # MAIN MENU
 # =========================
 @bot.message_handler(func=lambda m: m.text == "🏠 Домой")
-def home_menu(message):
-    go_main_menu(message.chat.id)
+def menu(message):
+    pending_search.discard(message.chat.id)
+    bot.send_message(
+        message.chat.id,
+        "Дополнительное меню:",
+        reply_markup=submenu_menu()
+    )
 
 
 @bot.message_handler(func=lambda m: m.text == "🔎 Смотреть все")
