@@ -156,6 +156,7 @@ view_state = {}
 # =========================
 def now_ts() -> int:
     return int(time.time())
+    
 def go_main_menu(chat_id: int, text: str = "Главное меню:"):
     pending_search.discard(chat_id)
     bot.send_message(chat_id, text, reply_markup=main_menu())
