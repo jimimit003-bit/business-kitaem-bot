@@ -724,7 +724,7 @@ def main_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     kb.row("🔎 Смотреть все", "✍️ Поиск по названию")
     kb.row("⚙️ Фильтры", "➕ Добавить")
-    kb.row("🏠 Домой")
+    kb.row("👤 Профиль")
     return kb
 
 
@@ -1366,22 +1366,32 @@ def archive_menu_handler(message):
     bot.send_message(chat_id, "🗂 Архив:", reply_markup=kb)
 
 
-@bot.message_handler(func=lambda m: m.text == "📊 Статистика")
+@bot.message_handler(func=lambda m: m.text in ["📊 Статистика", "👤 Профиль"])
 def stats_menu(message):
     chat_id = message.chat.id
     my_items = get_user_items(chat_id)
+
+    total_items = len(my_items)
+    active_items = len([item for item in my_items if item[8] == 0])
+    archive_items = len([item for item in my_items if item[8] == 1])
     total_views = sum(item[7] for item in my_items) if my_items else 0
     total_likes = sum(get_likes_count(item[0]) for item in my_items) if my_items else 0
     refs = get_referrals_count(chat_id)
 
     text = (
-        "📊 Твоя статистика:\n\n"
-        f"👥 Приглашено друзей: {refs}\n"
-        f"📦 Твоих объявлений: {len(my_items)}\n"
+        "👤 Профиль / статистика\n\n"
+        f"📦 Всего объявлений: {total_items}\n"
+        f"🟢 Активных: {active_items}\n"
+        f"🗂 В архиве: {archive_items}\n\n"
         f"👁 Просмотров: {total_views}\n"
-        f"❤️ Лайков: {total_likes}"
+        f"❤️ Лайков: {total_likes}\n"
+        f"👥 Приглашено друзей: {refs}"
     )
-    bot.send_message(chat_id, text, reply_markup=submenu_menu())
+
+    if message.text == "👤 Профиль":
+        bot.send_message(chat_id, text, reply_markup=main_menu())
+    else:
+        bot.send_message(chat_id, text, reply_markup=submenu_menu())
     
 
 
