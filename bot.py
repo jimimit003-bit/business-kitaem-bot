@@ -1203,7 +1203,7 @@ def start(message):
 # =========================
 @bot.message_handler(func=lambda m: m.text == "🏠 Домой")
 def home_menu(message):
-    bot.send_message(message.chat.id, "Главное меню:", reply_markup=main_menu())
+    go_main_menu(message.chat.id)
 
 
 @bot.message_handler(func=lambda m: m.text == "🔎 Смотреть все")
@@ -1275,7 +1275,11 @@ def browse_category_items(message):
 @bot.message_handler(func=lambda m: m.text == "✍️ Поиск по названию")
 def open_search(message):
     pending_search.add(message.chat.id)
-    bot.send_message(message.chat.id, "Напиши слово для поиска.\nНапример: куртка", reply_markup=submenu_menu())
+    bot.send_message(
+        message.chat.id,
+        "Напиши слово для поиска.\nНапример: куртка\n\nДля выхода нажми «⬅️ Назад» или «🏠 Домой».",
+        reply_markup=main_menu()
+    )
 
 
 @bot.message_handler(func=lambda m: m.text == "➕ Добавить")
@@ -1316,7 +1320,7 @@ def favorites_menu(message):
 
 @bot.message_handler(func=lambda m: m.text == "⬅️ Назад")
 def back(message):
-    bot.send_message(message.chat.id, "Дополнительное меню:", reply_markup=submenu_menu())
+    go_main_menu(message.chat.id)
 
 
 # =========================
