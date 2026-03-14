@@ -338,7 +338,19 @@ def get_items_for_browse(mode: str, category: Optional[str] = None):
         query += " AND category = ?"
         params.append(category)
 
-    query += " ORDER BY id DESC"
+    if mode == "all":
+        query += """
+            ORDER BY
+                CASE
+                    WHEN price = 0 THEN 0
+                    WHEN price > 0 AND price <= 400 THEN 1
+                    ELSE 2
+                END,
+                id DESC
+        """
+    else:
+        query += " ORDER BY id DESC"
+
     cursor.execute(query, tuple(params))
     return cursor.fetchall()
 
