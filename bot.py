@@ -510,7 +510,12 @@ def add_favorite(user_id: int, item_id: int):
         (user_id, item_id)
     )
     conn.commit()
-
+def remove_favorite(user_id: int, item_id: int):
+    cursor.execute(
+        "DELETE FROM favorites WHERE user_id = ? AND item_id = ?",
+        (user_id, item_id)
+    )
+    conn.commit()
 
 def get_favorites(user_id: int):
     cursor.execute("SELECT item_id FROM favorites WHERE user_id = ?", (user_id,))
@@ -1989,6 +1994,38 @@ def callback_handler(call):
             )
         return
 
+    if data.startswith("favremove_"):
+        item_id = int(data.split("_")[1])
+        user_id = get_user_id(chat_id)
+
+        remove_favorite(user_id, item_id)
+        bot.answer_callback_query(call.id, "Удалено из избранного")
+
+        state = get_view_state(chat_id)
+        if state and state.get("mode") == "favorites":
+            fav_ids = get_favorites(user_id)
+
+            items = []
+            for fav_item_id in fav_ids:
+                item = get_item_by_id(fav_item_id)
+                if item and item[8] == 0:
+                    items.append(item)
+
+            if not items:
+                bot.send_message(chat_id, "В избранном больше ничего нет ❤️", reply_markup=submenu_menu())
+                return
+
+            idx = user_index.get(chat_id, 0)
+            if idx >= len(items):
+                idx = 0
+            user_index[chat_id] = idx
+
+            set_view_state(chat_id, items[idx][0], mode="favorites", photo_idx=0)
+            show_item(chat_id, items[idx], mode="favorites")
+            return
+
+        return
+  
     if call.data.startswith("report_"):
         item_id = int(call.data.split("_")[1])
 
