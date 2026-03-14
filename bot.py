@@ -1344,7 +1344,21 @@ def favorites_menu(message):
 
 @bot.message_handler(func=lambda m: m.text == "⬅️ Назад")
 def back(message):
-    go_main_menu(message.chat.id)
+    chat_id = message.chat.id
+    pending_search.discard(chat_id)
+
+    st = get_view_state(chat_id)
+    mode = st.get("mode", "")
+
+    if mode in ["browse_all", "browse_free", "browse_cheap"] or str(mode).startswith("browse_cat:"):
+        bot.send_message(
+            chat_id,
+            "Выберите категорию или смотрите все объявления",
+            reply_markup=browse_menu()
+        )
+        return
+
+    bot.send_message(chat_id, "Главное меню:", reply_markup=main_menu())
 
 
 # =========================
