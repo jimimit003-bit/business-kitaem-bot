@@ -2021,10 +2021,16 @@ def callback_handler(call):
             user_index[chat_id] = idx
 
             set_view_state(chat_id, items[idx][0], mode="favorites", photo_idx=0)
-            show_item(chat_id, items[idx], mode="favorites")
+            
+            show_item(
+                chat_id,
+                items[idx],
+                mode="favorites",
+                message_id=call.message.message_id
+            )
             return
 
-        return
+        
   
     if call.data.startswith("report_"):
         item_id = int(call.data.split("_")[1])
