@@ -1836,38 +1836,38 @@ def callback_handler(call):
     data = call.data
 
     if data == "next":
-    state = get_view_state(chat_id)
+        state = get_view_state(chat_id)
 
-    if state and state.get("mode") == "favorites":
-        user_id = get_user_id(chat_id)
-        fav_ids = get_favorites(user_id)
+        if state and state.get("mode") == "favorites":
+            user_id = get_user_id(chat_id)
+            fav_ids = get_favorites(user_id)
 
-        items = []
-        for item_id in fav_ids:
-            item = get_item_by_id(item_id)
-            if item and item[8] == 0:
-                items.append(item)
+            items = []
+            for item_id in fav_ids:
+                item = get_item_by_id(item_id)
+                if item and item[8] == 0:
+                    items.append(item)
 
-        if not items:
-            bot.answer_callback_query(call.id, "Больше объявлений нет")
+            if not items:
+                bot.answer_callback_query(call.id, "Больше объявлений нет")
+                return
+
+            idx = user_index.get(chat_id, 0)
+            idx = (idx + 1) % len(items)
+
+            user_index[chat_id] = idx
+            show_item(chat_id, items[idx], mode="favorites")
+
+            bot.answer_callback_query(call.id)
             return
 
-        idx = user_index.get(chat_id, 0)
-        idx = (idx + 1) % len(items)
-
-        user_index[chat_id] = idx
-        show_item(chat_id, items[idx], mode="favorites")
-
-        bot.answer_callback_query(call.id)
-        return
-
-        idx = user_index.get(chat_id, 0)
-        idx = (idx + 1) % len(items)
-        user_index[chat_id] = idx
-        set_view_state(chat_id, items[idx][0], mode=mode, photo_idx=0)
-        show_item(chat_id, items[idx], message_id=call.message.message_id, mode=mode)
-        bot.answer_callback_query(call.id)
-        return
+    idx = user_index.get(chat_id, 0)
+    idx = (idx + 1) % len(items)
+    user_index[chat_id] = idx
+    set_view_state(chat_id, items[idx][0], mode=mode, photo_idx=0)
+    show_item(chat_id, items[idx], message_id=call.message.message_id, mode=mode)
+    bot.answer_callback_query(call.id)
+    return
 
     if data.startswith("prevphoto_") or data.startswith("nextphoto_"):
         try:
