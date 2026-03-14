@@ -1323,7 +1323,7 @@ def favorites_menu(message):
     fav_ids = get_favorites(user_id)
 
     if not fav_ids:
-        bot.send_message(chat_id, "В избранном пока пусто ❤️", reply_markup=main_menu())
+        bot.send_message(chat_id, "В избранном пока пусто ❤️", reply_markup=submenu_menu()
         return
 
     kb = types.InlineKeyboardMarkup()
