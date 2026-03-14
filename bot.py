@@ -1319,6 +1319,8 @@ def filters(message):
 @bot.message_handler(func=lambda m: m.text == "❤️ Избранное")
 def favorites_menu(message):
     chat_id = message.chat.id
+    pending_search.discard(chat_id)
+
     user_id = get_user_id(chat_id)
     fav_ids = get_favorites(user_id)
 
@@ -1326,20 +1328,25 @@ def favorites_menu(message):
         bot.send_message(chat_id, "В избранном пока пусто ❤️", reply_markup=submenu_menu())
         return
 
-    kb = types.InlineKeyboardMarkup()
-    has_any = False
+    items = []
 
     for item_id in fav_ids:
         item = get_item_by_id(item_id)
         if item and item[8] == 0:
-            kb.row(types.InlineKeyboardButton(short_item_label(item), callback_data=f"favopen_{item_id}"))
-            has_any = True
+            items.append(item)
 
-    if not has_any:
-        bot.send_message(chat_id, "В избранном сейчас нет активных объявлений", reply_markup=main_menu())
+    if not items:
+        bot.send_message(
+            chat_id,
+            "Все объявления из избранного уже неактивны",
+            reply_markup=submenu_menu()
+        )
         return
 
-    bot.send_message(chat_id, "❤️ Избранное:", reply_markup=kb)
+    user_index[chat_id] = 0
+    set_view_state(chat_id, items[0][0])
+
+    show_item(chat_id, items[0], mode="favorites")
 
 
 @bot.message_handler(func=lambda m: m.text == "⬅️ Назад")
@@ -1829,26 +1836,30 @@ def callback_handler(call):
     data = call.data
 
     if data == "next":
-        st = get_view_state(chat_id)
-        mode = st.get("mode", "feed")
+    state = get_view_state(chat_id)
 
-        if mode == "browse_all":
-            items = get_items_for_browse("all")
-        elif mode == "browse_free":
-            items = get_items_for_browse("free")
-        elif mode == "browse_cheap":
-            items = get_items_for_browse("cheap")
-        elif mode.startswith("browse_cat:"):
-            category = mode.split(":", 1)[1]
-            items = get_items_for_browse("all", category=category)
-        elif mode == "filtered":
-            items = get_filtered_items(chat_id)
-        else:
-            items = get_filtered_items(chat_id)
+    if state and state.get("mode") == "favorites":
+        user_id = get_user_id(chat_id)
+        fav_ids = get_favorites(user_id)
+
+        items = []
+        for item_id in fav_ids:
+            item = get_item_by_id(item_id)
+            if item and item[8] == 0:
+                items.append(item)
 
         if not items:
-            bot.answer_callback_query(call.id, "Нет объявлений")
+            bot.answer_callback_query(call.id, "Больше объявлений нет")
             return
+
+        idx = user_index.get(chat_id, 0)
+        idx = (idx + 1) % len(items)
+
+        user_index[chat_id] = idx
+        show_item(chat_id, items[idx], mode="favorites")
+
+        bot.answer_callback_query(call.id)
+        return
 
         idx = user_index.get(chat_id, 0)
         idx = (idx + 1) % len(items)
