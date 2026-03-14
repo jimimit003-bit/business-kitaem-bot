@@ -928,6 +928,10 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
         types.InlineKeyboardButton("📍 Поделиться объявлением", callback_data=f"share_{item_id}")
     )
 
+    kb.row(
+    types.InlineKeyboardButton("⚠️ Жалоба", callback_data=f"report_{item_id}")
+    )
+    
     if owner_tg == viewer_tg:
         kb.row(
             types.InlineKeyboardButton("✅ Отдано", callback_data=f"taken_{item_id}"),
