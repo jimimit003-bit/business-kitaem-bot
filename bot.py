@@ -913,6 +913,9 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
     likes_count = get_likes_count(item_id)
     photos = get_item_photos(item_id)
 
+    state = get_view_state(viewer_tg)
+    mode = state.get("mode", "feed") if state else "feed"
+
     if has_like(viewer_user_id, item_id):
         like_text = f"💔 Убрать лайк ({likes_count})"
     else:
@@ -931,6 +934,37 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
         types.InlineKeyboardButton(like_text, callback_data=f"like_{item_id}")
     )
 
+    # ===== режим избранного =====
+    if mode == "favorites":
+        kb.row(
+            types.InlineKeyboardButton("❤️ Убрать из избранного", callback_data=f"favremove_{item_id}"),
+            types.InlineKeyboardButton("💬 Написать", url=f"tg://user?id={owner_tg}")
+        )
+
+        kb.row(
+            types.InlineKeyboardButton("📍 Поделиться объявлением", callback_data=f"share_{item_id}")
+        )
+
+        if owner_tg != viewer_tg:
+            kb.row(
+                types.InlineKeyboardButton("🚩 Пожаловаться", callback_data=f"report_{item_id}")
+            )
+        else:
+            kb.row(
+                types.InlineKeyboardButton("🗂 В архив", callback_data=f"taken_{item_id}"),
+                types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}")
+            )
+            kb.row(
+                types.InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{item_id}"),
+                types.InlineKeyboardButton("📷 Заменить фото", callback_data=f"replacephoto_{item_id}")
+            )
+            kb.row(
+                types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
+            )
+
+        return kb
+
+    # ===== обычный режим =====
     kb.row(
         types.InlineKeyboardButton("❤️ В избранное", callback_data=f"fav_{item_id}"),
         types.InlineKeyboardButton("💬 Написать", url=f"tg://user?id={owner_tg}")
@@ -940,13 +974,9 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
         types.InlineKeyboardButton("📍 Поделиться объявлением", callback_data=f"share_{item_id}")
     )
 
-    kb.row(
-    types.InlineKeyboardButton("⚠️ Жалоба", callback_data=f"report_{item_id}")
-    )
-    
     if owner_tg == viewer_tg:
         kb.row(
-            types.InlineKeyboardButton("✅ Отдано", callback_data=f"taken_{item_id}"),
+            types.InlineKeyboardButton("🗂 В архив", callback_data=f"taken_{item_id}"),
             types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}")
         )
         kb.row(
@@ -959,7 +989,7 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
     else:
         kb.row(
             types.InlineKeyboardButton("✅ Забрать", callback_data=f"take_{item_id}"),
-            types.InlineKeyboardButton("⚠️ Жалоба", callback_data=f"report_{item_id}")
+            types.InlineKeyboardButton("🚩 Пожаловаться", callback_data=f"report_{item_id}")
         )
 
     return kb
