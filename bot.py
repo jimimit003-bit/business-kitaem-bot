@@ -1058,6 +1058,7 @@ def show_item(chat_id: int, item, count_view: bool = True, mode: str = "feed", m
             except Exception:
                 pass
 
+    if not message_id:
         try:
             bot.send_photo(chat_id, photos[photo_idx], caption=text, reply_markup=reply_markup)
             return
@@ -1076,7 +1077,8 @@ def show_item(chat_id: int, item, count_view: bool = True, mode: str = "feed", m
         except Exception:
             pass
 
-    bot.send_message(chat_id, text, reply_markup=reply_markup)
+    if not message_id:
+        bot.send_message(chat_id, text, reply_markup=reply_markup)
 
 
 def show_my_item(chat_id: int, item_id: int):
