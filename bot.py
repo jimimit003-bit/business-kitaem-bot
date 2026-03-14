@@ -2026,43 +2026,43 @@ def callback_handler(call):
         return
 
     if data.startswith("bump_"):
-    item_id = int(data.split("_")[1])
-    item = get_item_by_id(item_id)
-    if not item:
-        bot.answer_callback_query(call.id, "Объявление не найдено")
+        item_id = int(data.split("_")[1])
+        item = get_item_by_id(item_id)
+        if not item:
+            bot.answer_callback_query(call.id, "Объявление не найдено")
+            return
+
+        if item[6] != chat_id:
+            bot.answer_callback_query(call.id, "Можно поднимать только свои объявления")
+            return
+
+        if item[8] == 1:
+            bot.answer_callback_query(call.id, "Архивные объявления нельзя поднимать")
+            return
+
+        ok, remain = can_bump_item(item_id, chat_id)
+        if not ok:
+            bot.answer_callback_query(call.id, f"Можно через {format_seconds_to_human(remain)}")
+            return
+
+        new_item_id = bump_item(item_id, chat_id)
+        if new_item_id:
+            bot.answer_callback_query(call.id, "Объявление поднято 🚀")
+
+            new_item = get_item_by_id(new_item_id)
+            if new_item:
+                set_view_state(chat_id, new_item_id, mode="my", photo_idx=0)
+                show_item(
+                    chat_id,
+                    new_item,
+                    count_view=False,
+                    mode="my",
+                    message_id=call.message.message_id
+                )
+            return
+
+        bot.answer_callback_query(call.id, "Ошибка")
         return
-
-    if item[6] != chat_id:
-        bot.answer_callback_query(call.id, "Можно поднимать только свои объявления")
-        return
-
-    if item[8] == 1:
-        bot.answer_callback_query(call.id, "Архивные объявления нельзя поднимать")
-        return
-
-    ok, remain = can_bump_item(item_id, chat_id)
-    if not ok:
-        bot.answer_callback_query(call.id, f"Можно через {format_seconds_to_human(remain)}")
-        return
-
-    new_item_id = bump_item(item_id, chat_id)
-    if new_item_id:
-        bot.answer_callback_query(call.id, "Объявление поднято 🚀")
-
-        new_item = get_item_by_id(new_item_id)
-        if new_item:
-            set_view_state(chat_id, new_item_id, mode="my", photo_idx=0)
-            show_item(
-                chat_id,
-                new_item,
-                count_view=False,
-                mode="my",
-                message_id=call.message.message_id
-            )
-        return
-
-    bot.answer_callback_query(call.id, "Ошибка")
-    return
 
     if data.startswith("delete_"):
         item_id = int(data.split("_")[1])
