@@ -1263,7 +1263,7 @@ def start(message):
 
 
 # =========================
-# MAIN MENU
+# BROWSE MENU
 # =========================
 @bot.message_handler(func=lambda m: m.text == "🔎 Смотреть все")
 def open_browse_menu(message):
