@@ -969,37 +969,6 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
 
         return kb
 
-    # ===== обычный режим =====
-if owner_tg != viewer_tg:
-    kb.row(
-        types.InlineKeyboardButton("❤️ В избранное"),
-        types.InlineKeyboardButton("💬 Написать")
-    )    
-
-    kb.row(
-        types.InlineKeyboardButton("📍 Поделиться объявлением", callback_data=f"share_{item_id}")
-    )
-
-    if owner_tg == viewer_tg:
-        kb.row(
-            types.InlineKeyboardButton("🗂 В архив", callback_data=f"taken_{item_id}"),
-            types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}")
-        )
-        kb.row(
-            types.InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{item_id}"),
-            types.InlineKeyboardButton("📷 Заменить фото", callback_data=f"replacephoto_{item_id}")
-        )
-        kb.row(
-            types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
-        )
-    else:
-        kb.row(
-            types.InlineKeyboardButton("✅ Забрать", callback_data=f"take_{item_id}"),
-            types.InlineKeyboardButton("🚩 Пожаловаться", callback_data=f"report_{item_id}")
-        )
-
-    return kb
-
 
 def show_item(chat_id: int, item, count_view: bool = True, mode: str = "feed", message_id: Optional[int] = None):
     if not item:
