@@ -1265,16 +1265,6 @@ def start(message):
 # =========================
 # MAIN MENU
 # =========================
-@bot.message_handler(func=lambda m: m.text == "🏠 Домой")
-def menu(message):
-    pending_search.discard(message.chat.id)
-    bot.send_message(
-        message.chat.id,
-        "Дополнительное меню:",
-        reply_markup=submenu_menu()
-    )
-
-
 @bot.message_handler(func=lambda m: m.text == "🔎 Смотреть все")
 def open_browse_menu(message):
     chat_id = message.chat.id
@@ -1297,18 +1287,6 @@ def go_main_menu(message):
         "Главное меню:",
         reply_markup=main_menu()
     )  
-
-@bot.message_handler(func=lambda m: m.text == "🏠 Главное меню")
-def go_main_menu(message):
-    chat_id = message.chat.id
-    pending_search.discard(chat_id)
-    reset_filters(chat_id)
-    user_index[chat_id] = 0
-    bot.send_message(
-        chat_id,
-        "Главное меню:",
-        reply_markup=main_menu()
-    )
 
 @bot.message_handler(func=lambda m: m.text == "📦 Все объявления")
 def browse_all_items(message):
