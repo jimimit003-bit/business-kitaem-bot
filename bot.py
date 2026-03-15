@@ -1285,6 +1285,19 @@ def go_main_menu(message):
     pending_search.discard(chat_id)
     reset_filters(chat_id)
     user_index[chat_id] = 0
+
+    bot.send_message(
+        chat_id,
+        "Главное меню:",
+        reply_markup=main_menu()
+    )  
+
+@bot.message_handler(func=lambda m: m.text == "🏠 Главное меню")
+def go_main_menu(message):
+    chat_id = message.chat.id
+    pending_search.discard(chat_id)
+    reset_filters(chat_id)
+    user_index[chat_id] = 0
     bot.send_message(
         chat_id,
         "Главное меню:",
