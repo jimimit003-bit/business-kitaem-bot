@@ -1047,6 +1047,7 @@ def show_item(chat_id: int, item, count_view: bool = True, mode: str = "feed", m
     if photos:
         if photo_idx >= len(photos):
             photo_idx = 0
+
         if message_id:
             try:
                 media = types.InputMediaPhoto(photos[photo_idx], caption=text)
@@ -1060,12 +1061,17 @@ def show_item(chat_id: int, item, count_view: bool = True, mode: str = "feed", m
             except Exception:
                 pass
 
-    if not message_id:
-        try:
-            bot.send_photo(chat_id, photos[photo_idx], caption=text, reply_markup=reply_markup)
-            return
-        except ApiTelegramException:
-            pass
+        if not message_id:
+            try:
+                bot.send_photo(
+                    chat_id,
+                    photos[photo_idx],
+                    caption=text,
+                    reply_markup=reply_markup
+                )
+                return
+            except ApiTelegramException:
+                pass
 
     if message_id:
         try:
