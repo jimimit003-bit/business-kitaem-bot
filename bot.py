@@ -1383,7 +1383,7 @@ def favorites_menu(message):
         return
 
     user_index[chat_id] = 0
-    set_view_state(chat_id, items[0][0])
+    set_view_state(chat_id, items[0][0], mode="favorites", photo_idx=0)
 
     show_item(chat_id, items[0], mode="favorites")
 
