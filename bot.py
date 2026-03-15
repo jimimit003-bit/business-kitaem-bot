@@ -1351,6 +1351,22 @@ def browse_cheap_items(message):
     set_view_state(chat_id, items[0][0], mode="browse_cheap", photo_idx=0)
     show_item(chat_id, items[0], mode="browse_cheap")
 
+@bot.message_handler(func=lambda m: m.text == "🏡 Дом и дача")
+def browse_home_items(message):
+    chat_id = message.chat.id
+    items = get_items_for_browse("home")
+
+    if not items:
+        bot.send_message(
+            chat_id,
+            "Сейчас нет активных объявлений в категории «Дом и дача» 😔",
+            reply_markup=browse_menu()
+        )
+        return
+
+    user_index[chat_id] = 0
+    set_view_state(chat_id, items[0][0], mode="browse_cat:home", photo_idx=0)
+    show_item(chat_id, items[0], mode="browse_cat:home")
 
 @bot.message_handler(func=lambda m: m.text in BROWSE_CATEGORY_BUTTONS)
 def browse_category_items(message):
