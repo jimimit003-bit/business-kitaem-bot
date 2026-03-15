@@ -970,10 +970,11 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
         return kb
 
     # ===== обычный режим =====
+if owner_tg != viewer_tg:
     kb.row(
-        types.InlineKeyboardButton("❤️ В избранное", callback_data=f"fav_{item_id}"),
-        types.InlineKeyboardButton("💬 Написать", url=f"tg://user?id={owner_tg}")
-    )
+        types.InlineKeyboardButton("❤️ В избранное"),
+        types.InlineKeyboardButton("💬 Написать")
+    )    
 
     kb.row(
         types.InlineKeyboardButton("📍 Поделиться объявлением", callback_data=f"share_{item_id}")
