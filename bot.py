@@ -762,7 +762,7 @@ def browse_menu():
     kb.row("👕 Одежда", "👟 Обувь")
     kb.row("📱 Электроника", "🧸 Детям")
     kb.row("🏠 Дом и дача", "🚗 Авто")
-    kb.row("⬅️ Назад", "🏠 Главное меню")
+    kb.row("🏠 Главное меню")
     return kb
 
 
@@ -1279,6 +1279,17 @@ def open_browse_menu(message):
         reply_markup=browse_menu()
     )
 
+@bot.message_handler(func=lambda m: m.text == "🏠 Главное меню")
+def go_main_menu(message):
+    chat_id = message.chat.id
+    pending_search.discard(chat_id)
+    reset_filters(chat_id)
+    user_index[chat_id] = 0
+    bot.send_message(
+        chat_id,
+        "Главное меню:",
+        reply_markup=main_menu()
+    )
 
 @bot.message_handler(func=lambda m: m.text == "📦 Все объявления")
 def browse_all_items(message):
