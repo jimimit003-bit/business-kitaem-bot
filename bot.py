@@ -2012,10 +2012,10 @@ def callback_handler(call):
 
         if has_like(user_id, item_id):
             remove_like(user_id, item_id)
-            bot.answer_callback_query(call.id, "Лайк убран")
+            bot.answer_callback_query(call.id, "💔 Лайк убран")
         else:
             add_like(user_id, item_id)
-            bot.answer_callback_query(call.id, "Лайк поставлен")
+            bot.answer_callback_query(call.id, "❤️ Лайк поставлен")
 
             item = get_item_by_id(item_id)
             if item and item[6] != chat_id:
