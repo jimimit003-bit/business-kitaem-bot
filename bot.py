@@ -1271,8 +1271,10 @@ def menu(message):
 
 @bot.message_handler(func=lambda m: m.text == "🔎 Смотреть все")
 def open_browse_menu(message):
+    chat_id = message.chat.id
+    set_view_state(chat_id, 0, mode="browse_menu", photo_idx=0)
     bot.send_message(
-        message.chat.id,
+        chat_id,
         "Выберите категорию или смотрите все объявления",
         reply_markup=browse_menu()
     )
@@ -1394,9 +1396,14 @@ def back(message):
     pending_search.discard(chat_id)
 
     st = get_view_state(chat_id)
-    mode = st.get("mode", "")
+    mode = st.get("mode", "") if st else ""
+
+    if mode == "browse_menu":
+        bot.send_message(chat_id, "Главное меню:", reply_markup=main_menu())
+        return
 
     if mode in ["browse_all", "browse_free", "browse_cheap"] or str(mode).startswith("browse_cat:"):
+        set_view_state(chat_id, 0, mode="browse_menu", photo_idx=0)
         bot.send_message(
             chat_id,
             "Выберите категорию или смотрите все объявления",
