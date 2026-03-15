@@ -1045,6 +1045,8 @@ def show_item(chat_id: int, item, count_view: bool = True, mode: str = "feed", m
     reply_markup = build_card_keyboard(item_id, chat_id, owner_tg)
 
     if photos:
+        if photo_idx >= len(photos):
+            photo_idx = 0
         if message_id:
             try:
                 media = types.InputMediaPhoto(photos[photo_idx], caption=text)
