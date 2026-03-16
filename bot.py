@@ -921,18 +921,9 @@ def build_card_keyboard(item_id: int, viewer_tg, owner_tg):
     state = get_view_state(viewer_tg)
     mode = state.get("mode", "feed") if state else "feed"
 
-    if has_like(viewer_user_id, item_id):
-        like_text = f"💔 Убрать лайк ({likes_count})"
-    else:
-        like_text = f"❤️ Лайк ({likes_count})"
 
     kb = types.InlineKeyboardMarkup()
 
-    if len(photos) > 1:
-        kb.row(
-            types.InlineKeyboardButton("⬅️ Фото", callback_data=f"photo_prev_{item_id}"),
-            types.InlineKeyboardButton("Фото ➡️", callback_data=f"photo_next_{item_id}")
-        )
 
     kb.row(
         types.InlineKeyboardButton("➡️ Следующее", callback_data="next"),
