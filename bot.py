@@ -1905,7 +1905,28 @@ def finish_replace_photos(message):
 def callback_handler(call):
     chat_id = call.message.chat.id
     data = call.data
+    
+    if data == "go_main":
+        reset_filters(chat_id)
+        user_index[chat_id] = 0
+        bot.send_message(chat_id, "Главное меню:", reply_markup=main_menu())
+        bot.answer_callback_query(call.id)
+        return
 
+    if data == "back_to_list":
+        state = get_view_state(chat_id)
+        mode = state.get("mode", "") if state else ""
+
+        if mode in ["browse_all", "browse_free", "browse_cheap"]:
+            bot.send_message(chat_id, "Раздел объявлений:", reply_markup=browse_menu())
+        elif mode == "favorites":
+            favorites_menu(call.message)
+        else:
+            bot.send_message(chat_id, "Назад.", reply_markup=browse_menu())
+
+        bot.answer_callback_query(call.id)
+        return
+        
     if data == "next":
         state = get_view_state(chat_id)
         mode = state.get("mode", "feed") if state else "feed"
