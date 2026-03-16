@@ -970,28 +970,28 @@ def build_card_keyboard(item_id: int, viewer_tg, owner_tg):
 
     # ===== обычный режим =====
     if owner_tg != viewer_tg:
-    kb.row(
-        types.InlineKeyboardButton("🚩", callback_data=f"report_{item_id}"),
-        types.InlineKeyboardButton("❤️", callback_data=f"fav_{item_id}"),
-        types.InlineKeyboardButton("⏭️", callback_data="next"),
-        types.InlineKeyboardButton("💬", callback_data=f"chat_{item_id}")
-    )
-    kb.row(
-        types.InlineKeyboardButton("⬅️ Назад", callback_data="back_to_list"),
-        types.InlineKeyboardButton("🏠 Главное меню", callback_data="go_main")
-    )
-else:
-    kb.row(
-        types.InlineKeyboardButton("🗂 В архив", callback_data=f"archive_{item_id}"),
-        types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}")
-    )
-    kb.row(
-        types.InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{item_id}"),
-        types.InlineKeyboardButton("📷 Заменить фото", callback_data=f"replacephoto_{item_id}")
-    )
-    kb.row(
-        types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
-    )
+        kb.row(
+            types.InlineKeyboardButton("🚩", callback_data=f"report_{item_id}"),
+            types.InlineKeyboardButton("❤️", callback_data=f"fav_{item_id}"),
+            types.InlineKeyboardButton("⏭️", callback_data="next"),
+            types.InlineKeyboardButton("💬", callback_data=f"chat_{item_id}")
+        )
+        kb.row(
+            types.InlineKeyboardButton("⬅️ Назад", callback_data="back_to_list"),
+            types.InlineKeyboardButton("🏠 Главное меню", callback_data="go_main")
+        )
+    else:
+        kb.row(
+            types.InlineKeyboardButton("🗂 В архив", callback_data=f"archive_{item_id}"),
+            types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}")
+        )
+        kb.row(
+            types.InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{item_id}"),
+            types.InlineKeyboardButton("📷 Заменить фото", callback_data=f"replacephoto_{item_id}")
+        )
+        kb.row(
+            types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
+        )
 
     return kb
 
