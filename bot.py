@@ -925,11 +925,6 @@ def build_card_keyboard(item_id: int, viewer_tg, owner_tg):
     kb = types.InlineKeyboardMarkup()
 
 
-    kb.row(
-        types.InlineKeyboardButton("➡️ Следующее", callback_data="next"),
-        types.InlineKeyboardButton(like_text, callback_data=f"like_{item_id}")
-    )
-
     # ===== режим избранного =====
     if mode == "favorites":
         kb.row(
