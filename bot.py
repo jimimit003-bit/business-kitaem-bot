@@ -640,18 +640,23 @@ def item_to_text(item, photo_idx: int = 0) -> str:
     photos = get_item_photos(item_id)
     reports_count = get_reports_count(item_id)
 
-    text = f"🧥 {title}\n"
-    text += "🟢 Бесплатно\n" if price == 0 else f"💰 {price} ₽\n"
-    text += f"📍 {city}\n"
-    text += f"📦 {category}\n"
-    if subcategory:
-        text += f"📂 {subcategory}\n"
-    text += f"❤️ {likes_count} лайков\n"
-    text += f"👁 {views} просмотров"
+    if price == 0:
+    price_text = "Бесплатно"
+else:
+    price_text = f"{price} ₽"
+
+line1 = f"👕 {title}"
+if subcategory:
+    line1 += f" | {subcategory}"
+
+line2 = f"💰 {price_text} | 📍 {city}"
+line3 = f"📦 {category} | 👁 {views}"
+
+text = f"{line1}\n{line2}\n{line3}"
 
     if photos:
         safe_idx = min(photo_idx, len(photos) - 1)
-        text += f"\n📸 Фото: {safe_idx + 1}/{len(photos)}"
+        text += f" | 📸 {safe_idx + 1}/{len(photos)}"
 
     if bump_count > 0:
         text += f"\n🚀 Поднимали: {bump_count} раз"
