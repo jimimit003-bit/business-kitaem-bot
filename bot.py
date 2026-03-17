@@ -958,10 +958,11 @@ def build_card_keyboard(item_id: int, viewer_tg, owner_tg):
     if True:
         kb.row(
             types.InlineKeyboardButton("🚩", callback_data=f"report_{item_id}"),
+            types.InlineKeyboardButton("💬", callback_data=f"chat_{item_id}"),
             types.InlineKeyboardButton("❤️", callback_data=f"fav_{item_id}"),
-            types.InlineKeyboardButton("⏭️", callback_data="next"),
-            types.InlineKeyboardButton("💬", callback_data=f"chat_{item_id}")
+            types.InlineKeyboardButton("⏭️", callback_data="next")
         )
+
         kb.row(
             types.InlineKeyboardButton("⬅️ Назад", callback_data="back_to_list"),
             types.InlineKeyboardButton("🏠 Главное меню", callback_data="go_main")
