@@ -641,18 +641,19 @@ def item_to_text(item, photo_idx: int = 0) -> str:
     reports_count = get_reports_count(item_id)
 
     if price == 0:
-        price_text = "Бесплатно"
+        price_text = "🟢 <b>Бесплатно</b>"
     else:
-        price_text = f"{price} ₽"
+        price_text = f"💰 <b>{price} ₽</b>"
 
-    line1 = f"👕 {title}"
+    line1 = f"👕 <b>{title}</b}"
+
     if subcategory:
-        line1 += f" | {subcategory}"
+        line1 += f"\n{subcategory}"
 
-    line2 = f"💰 {price_text} | 📍 {city}"
-    line3 = f"📦 {category} | 👁 {views}"
+    line2 = f"{price_text}   📍 {city}"
+    line3 = f"📦 {category}   👁 {views}   📸 {safe_idx + 1}/{len(photos)}"
 
-    text = f"{line1}\n{line2}\n{line3}"
+    text = f"{line1}\n\n{line2}\n{line3}"
 
     if photos:
         safe_idx = min(photo_idx, len(photos) - 1)
