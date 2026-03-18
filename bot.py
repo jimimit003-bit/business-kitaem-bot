@@ -967,13 +967,14 @@ def build_card_keyboard(item_id: int, viewer_tg, owner_tg):
             types.InlineKeyboardButton("🚩", callback_data=f"report_{item_id}"),
             types.InlineKeyboardButton("💬", callback_data=f"write_{item_id}"),
             types.InlineKeyboardButton("❤️", callback_data=f"like_{item_id}"),
-            types.InlineKeyboardButton("◀️", callback_data=f"prev_{item_id}"),
-            types.InlineKeyboardButton("▶️", callback_data="next")
+            types.InlineKeyboardButton("◀️", callback_data=f"prevphoto_{item_id}"),
+            types.InlineKeyboardButton("▶️", callback_data=f"nextphoto_{item_id}")
         )
 
         kb.row(
             types.InlineKeyboardButton("⬅️ Назад", callback_data="back_to_list"),
-            types.InlineKeyboardButton("🏠 Главное меню", callback_data="go_main")
+            types.InlineKeyboardButton("🏠 Меню", callback_data="go_main"),
+            types.InlineKeyboardButton("➡️ Далее", callback_data="next_item")
         )
     else:
         kb.row(
@@ -1976,8 +1977,8 @@ def callback_handler(call):
         bot.answer_callback_query(call.id)
         return
     
-    if data == "next":
-        state = get_view_state(chat_id)
+    if data == "next_item":
+        state = get_view_state(chat_id) 
         mode = state.get("mode", "feed") if state else "feed"
 
         if mode == "favorites":
@@ -1985,32 +1986,12 @@ def callback_handler(call):
             fav_ids = get_favorites(user_id)
 
             items = []
-            for item_id in fav_ids:
-                item = get_item_by_id(item_id)
+            for fav_item_id in fav_ids:
+                item = get_item_by_id(fav_item_id) 
                 if item and item[8] == 0:
                     items.append(item)
 
-            if not items:
-                bot.answer_callback_query(call.id, "Больше объявлений нет")
-                return
-
-            idx = user_index.get(chat_id, 0)
-            idx = (idx + 1) % len(items)
-            user_index[chat_id] = idx
-
-            set_view_state(chat_id, items[idx][0], mode="favorites", photo_idx=0)
-
-            show_item(
-                chat_id,
-                items[idx],
-                mode="favorites",
-                message_id=call.message.message_id
-            )
-
-            bot.answer_callback_query(call.id)
-            return
-
-        if mode == "browse_all":
+        elif mode == "browse_all":
             items = get_items_for_browse("all")
         elif mode == "browse_free":
             items = get_items_for_browse("free")
@@ -2018,7 +1999,7 @@ def callback_handler(call):
             items = get_items_for_browse("cheap")
         elif str(mode).startswith("browse_cat:"):
             category = mode.split(":", 1)[1]
-            items = get_items_for_browse("all", category=category)
+            items = get_items_for_browse("all", category)
         elif mode == "filtered":
             items = get_filtered_items(chat_id)
         else:
@@ -2033,7 +2014,10 @@ def callback_handler(call):
         user_index[chat_id] = idx
 
         set_view_state(chat_id, items[idx][0], mode=mode, photo_idx=0)
-        show_item(chat_id, items[idx], message_id=call.message.message_id, mode=mode)
+
+        # новое сообщение, а не редактирование старого
+        show_item(chat_id, items[idx], message_id=None)
+
         bot.answer_callback_query(call.id)
         return
 
