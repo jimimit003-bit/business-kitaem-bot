@@ -1943,8 +1943,8 @@ def callback_handler(call):
             fav_ids = get_favorites(user_id)
 
             items = []
-            for item_id in fav_ids:
-                item = get_item_by_id(item_id)
+            for fav_item_id in fav_ids:
+                item = get_item_by_id(fav_item_id)
                 if item and item[8] == 0:
                     items.append(item)
 
