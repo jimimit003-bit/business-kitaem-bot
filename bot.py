@@ -964,15 +964,16 @@ def build_card_keyboard(item_id: int, viewer_tg, owner_tg):
     # ===== обычный режим =====
     if True:
         kb.row(
-            types.InlineKeyboardButton("🚩", callback_data=f"report_{item_id}"),
-            types.InlineKeyboardButton("💬", callback_data=f"chat_{item_id}"),
-            types.InlineKeyboardButton("❤️", callback_data=f"fav_{item_id}"),
-            types.InlineKeyboardButton("⏭️", callback_data="next")
+            types.InlineKeyboardButton("🚩", callback_data=f"report:{item_id}"),
+            types.InlineKeyboardButton("💬", callback_data=f"msg:{owner_tg}:{item_id}"),
+            types.InlineKeyboardButton("❤️", callback_data=f"fav:{item_id}"),
+            types.InlineKeyboardButton("◀️", callback_data=f"prev_item:{item_id}"),
+            types.InlineKeyboardButton("▶️", callback_data=f"next_item:{item_id}")
         )
 
         kb.row(
             types.InlineKeyboardButton("⬅️ Назад", callback_data="back_to_list"),
-            types.InlineKeyboardButton("🏠 Главное меню", callback_data="go_main")
+            types.InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")
         )
     else:
         kb.row(
