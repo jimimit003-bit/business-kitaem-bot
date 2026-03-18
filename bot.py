@@ -645,7 +645,7 @@ def item_to_text(item, photo_idx: int = 0) -> str:
     else:
         price_text = f"💰 <b>{price} ₽</b>"
 
-    line1 = f"👕 <b>{title}</b}"
+        line1 = f"👕 <b>{title}</b}"
 
     if subcategory:
         line1 += f"\n{subcategory}"
