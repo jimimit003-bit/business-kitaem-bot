@@ -1039,7 +1039,11 @@ def show_item(chat_id: int, item, count_view: bool = True, mode: str = "feed", m
 
         if message_id:
             try:
-                media = types.InputMediaPhoto(photos[photo_idx], caption=text)
+                media = types.InputMediaPhoto(
+                    media=photos[photo_idx],
+                    caption=text,
+                    parse_mode="HTML"
+                )
                 bot.edit_message_media(
                     media=media,
                     chat_id=chat_id,
