@@ -1065,8 +1065,8 @@ def show_item(chat_id: int, item, count_view: bool = True, mode: str = "feed", m
 
     if message_id:
         try:
-            bot.edit_message_text(
-                text=text,
+            bot.edit_message_caption(
+                caption=text,
                 chat_id=chat_id,
                 message_id=message_id,
                 reply_markup=reply_markup,
