@@ -1056,7 +1056,8 @@ def show_item(chat_id: int, item, count_view: bool = True, mode: str = "feed", m
                     chat_id,
                     photos[photo_idx],
                     caption=text,
-                    reply_markup=reply_markup
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
                 )
                 return
             except ApiTelegramException:
@@ -1068,7 +1069,8 @@ def show_item(chat_id: int, item, count_view: bool = True, mode: str = "feed", m
                 text=text,
                 chat_id=chat_id,
                 message_id=message_id,
-                reply_markup=reply_markup
+                reply_markup=reply_markup,
+                parse_mode="HTML"
             )
             return
         except Exception:
