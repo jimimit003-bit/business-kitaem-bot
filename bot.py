@@ -633,31 +633,32 @@ def short_item_label(item):
     return f"#{item_id} {title} | {price_text} | {city}"
 
 
-def item_to_text(item, photo_idx: int = 0) -> str:
-    item_id, title, price, city, category, subcategory, owner_tg, views, is_taken, bump_count, last_bump_at, created_at = item
+def item_to_text(item, photo_idx: int = 0):
+    item_id, title, price, city, category, subcategory, owner_tg, views, is_taken, bump_count = item[:10]
 
-    likes_count = get_likes_count(item_id)
     photos = get_item_photos(item_id)
     reports_count = get_reports_count(item_id)
+
+    if photos:
+        safe_idx = min(photo_idx, len(photos) - 1)
+        photos_count = len(photos)
+    else:
+        safe_idx = 0
+        photos_count = 1
 
     if price == 0:
         price_text = "🟢 <b>Бесплатно</b>"
     else:
         price_text = f"💰 <b>{price} ₽</b>"
 
-        line1 = f"👕 <b>{title}</b}"
-
+    line1 = f"👕 <b>{title}</b>"
     if subcategory:
         line1 += f"\n{subcategory}"
 
     line2 = f"{price_text}   📍 {city}"
-    line3 = f"📦 {category}   👁 {views}   📸 {safe_idx + 1}/{len(photos)}"
+    line3 = f"📦 {category}   👁 {views}   📸 {safe_idx + 1}/{photos_count}"
 
     text = f"{line1}\n\n{line2}\n{line3}"
-
-    if photos:
-        safe_idx = min(photo_idx, len(photos) - 1)
-        text += f" | 📸 {safe_idx + 1}/{len(photos)}"
 
     if bump_count > 0:
         text += f"\n🚀 Поднимали: {bump_count} раз"
