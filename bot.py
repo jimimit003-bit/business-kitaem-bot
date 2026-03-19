@@ -973,7 +973,6 @@ def build_card_keyboard(item_id: int, viewer_tg, owner_tg):
         )
 
         kb.row(
-            types.InlineKeyboardButton("⬅️ Назад", callback_data="back_to_list"),
             types.InlineKeyboardButton("🏠 Меню", callback_data="go_main"),
             types.InlineKeyboardButton("➡️ Далее", callback_data="next_item")
         )
