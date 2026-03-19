@@ -748,8 +748,7 @@ def get_view_state(chat_id: int):
 def main_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     kb.row("🔎 Смотреть все", "✍️ Поиск по названию")
-    kb.row("⚙️ Фильтры", "➕ Добавить")
-    kb.row("👤 Профиль")
+    kb.row("➕ Добавить", "👤 Профиль")
     return kb
 
 
