@@ -1260,7 +1260,7 @@ def start(message):
 
 
 # =========================
-# BROWSE MENU
+#"BROWSE_MENU"
 # =========================
 @bot.message_handler(func=lambda m: m.text == "🔎 Смотреть все")
 def open_browse_menu(message):
@@ -1407,8 +1407,12 @@ def back(message):
     st = get_view_state(chat_id)
     mode = st.get("mode", "") if st else ""
 
-    if mode == "browse_menu":
-        bot.send_message(chat_id, "Главное меню:", reply_markup=main_menu())
+    if mode == "browse_categories":
+        bot.send_message(
+            chat_id,
+            "Выберите категорию или смотрите все объявления",
+            reply_markup=browse_menu()
+        )
         return
 
     if mode in ["browse_all", "browse_free", "browse_cheap"] or str(mode).startswith("browse_cat:"):
