@@ -1429,7 +1429,7 @@ def back(message):
         )
         return
 
-    if mode in ["browse_all", "browse_free", "browse_cheap", "browse_filtered"] or str(mode).startswith("browse_category_"):
+    if str(mode).startswith("browse_"):
         set_view_state(chat_id, 0, mode="browse_categories", photo_idx=0)
         bot.send_message(
             chat_id,
