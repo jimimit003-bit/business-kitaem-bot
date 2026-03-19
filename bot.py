@@ -1359,7 +1359,12 @@ def add_menu(message):
 
 @bot.message_handler(func=lambda m: m.text == "⚙️ Фильтры")
 def filters(message):
-    show_filters_menu(message.chat.id)
+    chat_id = message.chat.id
+
+    # 👉 сохраняем состояние
+    set_view_state(chat_id, 0, mode="filters")
+
+    show_filters_menu(chat_id)
 
 
 @bot.message_handler(func=lambda m: m.text == "❤️ Избранное")
