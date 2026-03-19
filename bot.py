@@ -1411,7 +1411,6 @@ def back(message):
 
     st = get_view_state(chat_id)
     mode = st.get("mode", "") if st else ""
-    bot.send_message(chat_id, f"DEBUG mode = {mode}")
     if mode == "filters":
         set_view_state(chat_id, 0, mode="browse_categories")
         bot.send_message(
