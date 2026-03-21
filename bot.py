@@ -1589,7 +1589,7 @@ def search_text_handler(message):
         bot.send_message(chat_id, "Пустой запрос", reply_markup=submenu_menu())
         return
 
-    rows = search_items(chat_id, query_text)
+    rows = search_items_by_title(query_text)
     if not rows:
         bot.send_message(chat_id, f"По запросу «{query_text}» ничего не найдено", reply_markup=submenu_menu())
         return
@@ -1599,7 +1599,16 @@ def search_text_handler(message):
         kb.row(types.InlineKeyboardButton(short_item_label(item), callback_data=f"searchopen_{item[0]}"))
 
     bot.send_message(chat_id, f"🔍 Результаты поиска: {query_text}", reply_markup=kb)
-
+    
+def search_items_by_title(query):
+    cursor.execute("""
+        SELECT id, title, price, city, category, subcategory, owner_tg, views, is_taken, bump_count
+        FROM items
+        WHERE is_taken = 0
+          AND LOWER(title) LIKE ?
+        ORDER BY id DESC
+    """, (f"%{query.lower()}%",))
+    return cursor.fetchall()
 
 # =========================
 # FILTERS
