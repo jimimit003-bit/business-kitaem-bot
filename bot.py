@@ -1472,12 +1472,6 @@ def archive_menu_handler(message):
         )
         return
 
-    kb = types.InlineKeyboardMarkup()
-    for item in rows[:20]:
-        kb.row(types.InlineKeyboardButton(short_item_label(item), callback_data=f"architem_{item[0]}"))
-
-    bot.send_message(chat_id, "🗂 Архив:", reply_markup=kb)
-
 
 @bot.message_handler(func=lambda m: m.text == "👤 Профиль")
 def profile_menu(message):
@@ -1594,16 +1588,14 @@ def search_text_handler(message):
         return
 
     rows = search_items_by_title(query_text)
-    
+
     if not rows:
-        bot.send_message(chat_id, f"По запросу «{query_text}» ничего не найдено", reply_markup=submenu_menu())
+        bot.send_message(chat_id, f"По запросу «{query_text}» ничего не найдено")
         return
 
-    kb = types.InlineKeyboardMarkup()
-    for item in rows[:20]:
-        kb.row(types.InlineKeyboardButton(short_item_label(item), callback_data=f"searchopen_{item[0]}"))
-
-    bot.send_message(chat_id, f"🔍 Результаты поиска: {query_text}", reply_markup=kb)
+    user_index[chat_id] = 0
+    set_view_state(chat_id, rows[0][0], mode="search")
+    show_item(chat_id, rows[0], mode="search")
     
 def search_items_by_title(query):
     q = (query or "").strip().casefold()
