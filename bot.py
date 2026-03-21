@@ -1622,7 +1622,13 @@ def search_items_by_title(query):
 # =========================
 @bot.message_handler(func=lambda m: m.text == "📍 Город" and m.chat.id not in pending_create)
 def filter_city(message):
-    bot.send_message(message.chat.id, "Выбери город:", reply_markup=city_menu())
+    ensure_filters(message.chat.id)
+    user_filters[message.chat.id]["waiting_city"] = True
+    bot.send_message(
+        message.chat.id,
+        "Выбери город кнопкой или напиши свой город вручную:",
+        reply_markup=city_menu()
+    )
 
 
 @bot.message_handler(func=lambda m: m.text == "📦 Категория" and m.chat.id not in pending_create)
@@ -1675,10 +1681,18 @@ def show_filtered(message):
     show_item(chat_id, items[0], mode="filtered")
 
 
-@bot.message_handler(func=lambda m: (m.text in POPULAR_CITIES or m.text == "🌍 Любой город") and m.chat.id not in pending_create)
+@bot.message_handler(func=lambda m: m.chat.id in user_filters and user_filters[m.chat.id].get("waiting_city"))
 def set_city_filter(message):
     ensure_filters(message.chat.id)
-    user_filters[message.chat.id]["city"] = None if message.text == "🌍 Любой город" else message.text
+
+    text = (message.text or "").strip()
+
+    if text == "🌍 Любой город":
+        user_filters[message.chat.id]["city"] = None
+    else:
+        user_filters[message.chat.id]["city"] = text
+
+    user_filters[message.chat.id]["waiting_city"] = False
     show_filters_menu(message.chat.id, "📍 Фильтр по городу обновлён")
 
 
