@@ -1601,7 +1601,7 @@ def search_items_by_title(query):
     q = (query or "").strip().casefold()
 
     cursor.execute("""
-        SELECT id, title, price, city, category, subcategory, owner_tg, views, is_taken, bump_count
+        SELECT id, title, price, city, category, subcategory, owner_tg, views, is_taken, bump_count, last_bump_at, created_at
         FROM items
         ORDER BY id DESC
     """)
