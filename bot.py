@@ -1607,17 +1607,26 @@ def search_text_handler(message):
     bot.send_message(chat_id, f"🔍 Результаты поиска: {query_text}", reply_markup=kb)
     
 def search_items_by_title(query):
+    q = (query or "").strip().casefold()
+
     cursor.execute("""
         SELECT id, title, price, city, category, subcategory, owner_tg, views, is_taken, bump_count
         FROM items
-        WHERE LOWER(title) LIKE ?
         ORDER BY id DESC
-    """, (f"%{query.lower()}%",))
-
+    """)
     rows = cursor.fetchall()
+
+    result = []
+    for row in rows:
+        title = (row[1] or "").casefold()
+        is_taken = row[8]
+
+        if q in title and is_taken == 0:
+            result.append(row)
+
     print("SEARCH QUERY:", query)
-    print("FOUND ROWS:", rows)
-    return rows
+    print("FOUND ROWS:", result)
+    return result
 
 # =========================
 # FILTERS
