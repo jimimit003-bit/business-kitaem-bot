@@ -1610,8 +1610,7 @@ def search_items_by_title(query):
     cursor.execute("""
         SELECT id, title, price, city, category, subcategory, owner_tg, views, is_taken, bump_count
         FROM items
-        WHERE is_taken = 0
-          AND LOWER(title) LIKE ?
+        WHERE LOWER(title) LIKE ?
         ORDER BY id DESC
     """, (f"%{query.lower()}%",))
 
