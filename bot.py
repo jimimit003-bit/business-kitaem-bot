@@ -1594,7 +1594,6 @@ def search_text_handler(message):
         return
 
     rows = search_items_by_title(query_text)
-    bot.send_message(chat_id, f"DEBUG rows = {len(rows)}")
     
     if not rows:
         bot.send_message(chat_id, f"По запросу «{query_text}» ничего не найдено", reply_markup=submenu_menu())
@@ -1624,8 +1623,6 @@ def search_items_by_title(query):
         if q in title and is_taken == 0:
             result.append(row)
 
-    print("SEARCH QUERY:", query)
-    print("FOUND ROWS:", result)
     return result
 
 # =========================
