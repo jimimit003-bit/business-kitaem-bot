@@ -1465,7 +1465,11 @@ def archive_menu_handler(message):
     rows = get_user_archive_items(chat_id)
 
     if not rows:
-        bot.send_message(chat_id, "Архив пуст 🗂", reply_markup=submenu_menu())
+        bot.send_message(
+            chat_id,
+            f"По запросу «{query_text}» ничего не найдено",
+            reply_markup=main_menu()
+        )
         return
 
     kb = types.InlineKeyboardMarkup()
@@ -1590,6 +1594,8 @@ def search_text_handler(message):
         return
 
     rows = search_items_by_title(query_text)
+    bot.send_message(chat_id, f"DEBUG rows = {len(rows)}")
+    
     if not rows:
         bot.send_message(chat_id, f"По запросу «{query_text}» ничего не найдено", reply_markup=submenu_menu())
         return
@@ -1608,7 +1614,11 @@ def search_items_by_title(query):
           AND LOWER(title) LIKE ?
         ORDER BY id DESC
     """, (f"%{query.lower()}%",))
-    return cursor.fetchall()
+
+    rows = cursor.fetchall()
+    print("SEARCH QUERY:", query)
+    print("FOUND ROWS:", rows)
+    return rows
 
 # =========================
 # FILTERS
