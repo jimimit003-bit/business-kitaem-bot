@@ -967,7 +967,7 @@ def build_card_keyboard(item_id: int, viewer_tg, owner_tg):
         kb.row(
             types.InlineKeyboardButton("🚩", callback_data=f"report_{item_id}"),
             types.InlineKeyboardButton("💬", callback_data=f"write_{item_id}"),
-            types.InlineKeyboardButton("❤️", callback_data=f"like_{item_id}"),
+            types.InlineKeyboardButton("❤️", callback_data=f"fav_{item_id}")
             types.InlineKeyboardButton("◀️", callback_data=f"prevphoto_{item_id}"),
             types.InlineKeyboardButton("▶️", callback_data=f"nextphoto_{item_id}")
         )
@@ -2082,83 +2082,20 @@ def callback_handler(call):
         bot.answer_callback_query(call.id)
         return
 
-    if data.startswith("like_"):
-        item_id = int(data.split("_")[1])
-        user_id = get_user_id(chat_id)
-
-        if has_like(user_id, item_id):
-            remove_like(user_id, item_id)
-            bot.answer_callback_query(call.id, "💔 Лайк убран")
-        else:
-            add_like(user_id, item_id)
-            bot.answer_callback_query(call.id, "❤️ Лайк поставлен")
-
-            item = get_item_by_id(item_id)
-            if item and item[6] != chat_id:
-                send_owner_notification(
-                    item_id,
-                    f"❤️ Кто-то поставил лайк твоему объявлению\n\n🧥 {item[1]}\n📍 {item[3]}",
-                    exclude_tg=chat_id
-                )
-
-        item = get_item_by_id(item_id)
-        if item and item[8] == 0:
-            st = get_view_state(chat_id)
-            show_item(chat_id, item, count_view=False, mode=st.get("mode", "feed"), message_id=call.message.message_id)
-        return
-
     if data.startswith("fav_"):
         item_id = int(data.split("_")[1])
         user_id = get_user_id(chat_id)
-        add_favorite(user_id, item_id)
-        bot.answer_callback_query(call.id, "Добавлено в избранное ❤️")
 
-        item = get_item_by_id(item_id)
-        if item and item[6] != chat_id:
-            send_owner_notification(
-                item_id,
-                f"⭐ Кто-то добавил твоё объявление в избранное\n\n🧥 {item[1]}\n📍 {item[3]}",
-                exclude_tg=chat_id
-            )
+        fav_ids = get_favorites(user_id)
+
+        if item_id in fav_ids:
+            remove_favorite(user_id, item_id)
+            bot.answer_callback_query(call.id, "❌ Удалено из избранного")
+        else:
+            add_favorite(user_id, item_id)
+            bot.answer_callback_query(call.id, "❤️ Добавлено в избранное")
+
         return
-
-    if data.startswith("favremove_"):
-        item_id = int(data.split("_")[1])
-        user_id = get_user_id(chat_id)
-
-        remove_favorite(user_id, item_id)
-        bot.answer_callback_query(call.id, "Удалено из избранного")
-
-        state = get_view_state(chat_id)
-        if state and state.get("mode") == "favorites":
-            fav_ids = get_favorites(user_id)
-
-            items = []
-            for fav_item_id in fav_ids:
-                item = get_item_by_id(fav_item_id)
-                if item and item[8] == 0:
-                    items.append(item)
-
-            if not items:
-                bot.send_message(chat_id, "В избранном больше ничего нет ❤️", reply_markup=submenu_menu())
-                return
-
-            idx = user_index.get(chat_id, 0)
-            if idx >= len(items):
-                idx = 0
-            user_index[chat_id] = idx
-
-            set_view_state(chat_id, items[idx][0], mode="favorites", photo_idx=0)
-            
-            show_item(
-                chat_id,
-                items[idx],
-                mode="favorites",
-                message_id=call.message.message_id
-            )
-            return
-
-        
   
     if call.data.startswith("report_"):
         item_id = int(call.data.split("_")[1])
