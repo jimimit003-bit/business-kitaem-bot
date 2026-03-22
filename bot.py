@@ -725,7 +725,7 @@ def get_user_profile_text(chat_id: int) -> str:
         f"🟢 Активных: {len(active_items)}\n"
         f"🗂 В архиве: {len(archive_items)}\n"
         f"👁 Всего просмотров: {total_views}\n"
-        f"❤️ Всего лайков: {total_likes}\n"
+        f"⭐ В избранном: {len(get_favorites(chat_id))}\n"
         f"👥 Приглашено друзей: {referrals}"
     )
 
