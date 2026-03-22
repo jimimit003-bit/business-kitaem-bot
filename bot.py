@@ -716,7 +716,6 @@ def get_user_profile_text(chat_id: int) -> str:
     active_items = [x for x in my_items if x[8] == 0]
     archive_items = [x for x in my_items if x[8] == 1]
     total_views = sum(item[7] for item in my_items) if my_items else 0
-    total_likes = sum(get_likes_count(item[0]) for item in my_items) if my_items else 0
     referrals = get_referrals_count(chat_id)
 
     return (
