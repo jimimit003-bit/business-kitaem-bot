@@ -1493,13 +1493,15 @@ def stats_menu(message):
     total_views = sum(item[7] for item in my_items) if my_items else 0
     total_bumps = sum(item[9] for item in my_items)
     refs = get_referrals_count(chat_id)
-
+    favorites_count = len(get_favorites(chat_id))
+    
     text = (
         "📊 Статистика\n\n"
         f"📦 Всего объявлений: {total_items}\n"
         f"🟢 Активных: {active_items}\n"
         f"🗂 В архиве: {archive_items}\n\n"
         f"👁 Просмотров: {total_views}\n"
+        f"❤️ В избранном: {favorites_count}\n"
         f"🚀 Поднятий: {total_bumps}\n"
         f"👥 Приглашено друзей: {refs}"
     )
