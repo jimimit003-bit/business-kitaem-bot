@@ -1491,7 +1491,6 @@ def stats_menu(message):
     active_items = len([item for item in my_items if item[8] == 0])
     archive_items = len([item for item in my_items if item[8] == 1])
     total_views = sum(item[7] for item in my_items) if my_items else 0
-    total_likes = sum(get_likes_count(item[0]) for item in my_items) if my_items else 0
     total_bumps = sum(item[9] for item in my_items)
     refs = get_referrals_count(chat_id)
 
@@ -1501,7 +1500,6 @@ def stats_menu(message):
         f"🟢 Активных: {active_items}\n"
         f"🗂 В архиве: {archive_items}\n\n"
         f"👁 Просмотров: {total_views}\n"
-        f"❤️ Лайков: {total_likes}\n"
         f"🚀 Поднятий: {total_bumps}\n"
         f"👥 Приглашено друзей: {refs}"
     )
