@@ -967,7 +967,7 @@ def build_card_keyboard(item_id: int, viewer_tg, owner_tg):
         kb.row(
             types.InlineKeyboardButton("🚩", callback_data=f"report_{item_id}"),
             types.InlineKeyboardButton("💬", callback_data=f"write_{item_id}"),
-            types.InlineKeyboardButton("❤️", callback_data=f"fav_{item_id}")
+            types.InlineKeyboardButton("❤️", callback_data=f"fav_{item_id}"),
             types.InlineKeyboardButton("◀️", callback_data=f"prevphoto_{item_id}"),
             types.InlineKeyboardButton("▶️", callback_data=f"nextphoto_{item_id}")
         )
