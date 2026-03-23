@@ -933,33 +933,19 @@ def build_card_keyboard(item_id: int, viewer_tg, owner_tg):
 
 
     # ===== режим избранного =====
-    if mode == "favorites":
-        kb.row(
-            types.InlineKeyboardButton("❤️ Убрать из избранного", callback_data=f"favremove_{item_id}"),
-            types.InlineKeyboardButton("💬 Написать", callback_data=f"chat_{item_id}")
-        )
-        kb.row(
-            types.InlineKeyboardButton("📍 Поделиться объявлением", callback_data=f"share_{item_id}")
-        )
-
-        if owner_tg != viewer_tg:
-            kb.row(
-                types.InlineKeyboardButton("🚩 Пожаловаться", callback_data=f"report_{item_id}")
-            )
-        else:
-            kb.row(
-                types.InlineKeyboardButton("🗂 В архив", callback_data=f"archive_{item_id}"),
-                types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}")
-            )
-            kb.row(
-                types.InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{item_id}"),
-                types.InlineKeyboardButton("📷 Заменить фото", callback_data=f"replacephoto_{item_id}")
-            )
-            kb.row(
-                types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
-            )
-
-        return kb
+if mode == "favorites":
+    kb.row(
+        types.InlineKeyboardButton("❤️ Убрать из избранного", callback_data=f"fav_{item_id}"),
+        types.InlineKeyboardButton("💬 Написать", callback_data=f"write_{item_id}")
+    )
+    kb.row(
+        types.InlineKeyboardButton("📍 Поделиться объявлением", callback_data=f"share_{item_id}")
+    )
+    kb.row(
+        types.InlineKeyboardButton("🏠 Меню", callback_data="go_main"),
+        types.InlineKeyboardButton("➡️ Далее", callback_data="next_item")
+    )
+    return kb
 
     # ===== обычный режим =====
     if True:
