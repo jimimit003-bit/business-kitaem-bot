@@ -1436,8 +1436,6 @@ def back(message):
         )
         return
 
-    bot.send_message(chat_id, "Главное меню:", reply_markup=main_menu())
-
 
 # =========================
 # SUBMENU
