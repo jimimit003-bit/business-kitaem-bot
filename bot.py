@@ -1410,8 +1410,9 @@ def back(message):
 
     st = get_view_state(chat_id)
     mode = st.get("mode", "") if st else ""
+
     if mode == "filters":
-        set_view_state(chat_id, 0, mode="browse_categories")
+        set_view_state(chat_id, 0, mode="browse_menu", photo_idx=0)
         bot.send_message(
             chat_id,
             "Выберите категорию или смотрите все объявления",
@@ -1420,21 +1421,19 @@ def back(message):
         return
 
     if mode == "browse_categories":
-        bot.send_message(
-            chat_id,
-            "Главное меню:",
-            reply_markup=main_menu()
-        )
+        bot.send_message(chat_id, "Главное меню:", reply_markup=main_menu())
         return
 
-    if str(mode).startswith("browse_") or mode == "feed":
-        set_view_state(chat_id, 0, mode="browse_categories", photo_idx=0)
+    if mode in ["browse_all", "browse_free", "browse_cheap", "filtered"] or str(mode).startswith("browse_cat:"):
+        set_view_state(chat_id, 0, mode="browse_menu", photo_idx=0)
         bot.send_message(
             chat_id,
             "Выберите категорию или смотрите все объявления",
             reply_markup=browse_menu()
         )
         return
+
+    bot.send_message(chat_id, "Главное меню:", reply_markup=main_menu())
 
 
 # =========================
