@@ -939,10 +939,7 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
     )
 
     kb.row(
-        types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
-    )
-
-    kb.row(
+        types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}"),
         types.InlineKeyboardButton("➡️ Далее", callback_data="next_item")
     )
 
