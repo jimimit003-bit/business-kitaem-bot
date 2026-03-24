@@ -921,25 +921,33 @@ def show_filters_menu(chat_id: int, notice: Optional[str] = None):
 # CARD / SHOW ITEM
 # =========================
 def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
-    state = get_view_state(viewer_tg)
-    mode = state.get("mode", "feed") if state else "feed"
-
     kb = types.InlineKeyboardMarkup()
 
-    # ===== режим избранного =====
-    if mode == "favorites":
-        kb.row(
-            types.InlineKeyboardButton("❤️ Убрать из избранного", callback_data=f"fav_{item_id}"),
-            types.InlineKeyboardButton("💬 Написать", callback_data=f"write_{item_id}")
-        )
-        kb.row(
-            types.InlineKeyboardButton("📍 Поделиться объявлением", callback_data=f"share_{item_id}")
-        )
-        kb.row(
-            types.InlineKeyboardButton("🏠 Меню", callback_data="go_main"),
-            types.InlineKeyboardButton("➡️ Далее", callback_data="next_item")
-        )
-        return kb
+    kb.row(
+        types.InlineKeyboardButton("◀️", callback_data=f"prevphoto_{item_id}"),
+        types.InlineKeyboardButton("▶️", callback_data=f"nextphoto_{item_id}")
+    )
+
+    kb.row(
+        types.InlineKeyboardButton("📦 В архив", callback_data=f"archive_{item_id}"),
+        types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}")
+    )
+
+    kb.row(
+        types.InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{item_id}"),
+        types.InlineKeyboardButton("📷 Заменить фото", callback_data=f"replacephoto_{item_id}")
+    )
+
+    kb.row(
+        types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
+    )
+
+    kb.row(
+        types.InlineKeyboardButton("🏠 Меню", callback_data="go_main"),
+        types.InlineKeyboardButton("➡️ Далее", callback_data="next_item")
+    )
+
+    return kb
 
     # ===== обычный просмотр чужого объявления =====
     if owner_tg != viewer_tg:
