@@ -1317,61 +1317,11 @@ def go_main_menu(message):
         reply_markup=main_menu()
     )  
 
-@bot.message_handler(func=lambda m: m.text == "📦 Все объявления")
-def browse_all_items(message):
+@bot.message_handler(func=lambda m: m.text in BROWSE_TARGETS)
+def open_browse_section(message):
     chat_id = message.chat.id
-    items = get_items_for_browse("all")
-
-    if not items:
-        bot.send_message(chat_id, "Сейчас нет активных объявлений 😔", reply_markup=browse_menu())
-        return
-
-    user_index[chat_id] = 0
-    set_view_state(chat_id, items[0][0], mode="browse_all", photo_idx=0)
-    show_item(chat_id, items[0], mode="browse_all")
-
-
-@bot.message_handler(func=lambda m: m.text == "🎁 Бесплатно")
-def browse_free_items(message):
-    chat_id = message.chat.id
-    items = get_items_for_browse("free")
-
-    if not items:
-        bot.send_message(chat_id, "Бесплатных объявлений пока нет 😔", reply_markup=browse_menu())
-        return
-
-    user_index[chat_id] = 0
-    set_view_state(chat_id, items[0][0], mode="browse_free", photo_idx=0)
-    show_item(chat_id, items[0], mode="browse_free")
-
-
-@bot.message_handler(func=lambda m: m.text == "💸 За копейки")
-def browse_cheap_items(message):
-    chat_id = message.chat.id
-    items = get_items_for_browse("cheap")
-
-    if not items:
-        bot.send_message(chat_id, "Объявлений за копейки пока нет 😔", reply_markup=browse_menu())
-        return
-
-    user_index[chat_id] = 0
-    set_view_state(chat_id, items[0][0], mode="browse_cheap", photo_idx=0)
-    show_item(chat_id, items[0], mode="browse_cheap")
-
-
-@bot.message_handler(func=lambda m: m.text in BROWSE_CATEGORY_BUTTONS)
-def browse_category_items(message):
-    chat_id = message.chat.id
-    category = BROWSE_CATEGORY_BUTTONS[message.text]
-    items = get_items_for_browse("all", category=category)
-
-    if not items:
-        bot.send_message(chat_id, f"В категории «{category}» пока нет объявлений 😔", reply_markup=browse_menu())
-        return
-
-    user_index[chat_id] = 0
-    set_view_state(chat_id, items[0][0], mode=f"browse_cat:{category}", photo_idx=0)
-    show_item(chat_id, items[0], mode=f"browse_cat:{category}")
+    mode_key, category, title = BROWSE_TARGETS[message.text]
+    show_browse_section(chat_id, mode_key, category=category, title=title)
 
 
 @bot.message_handler(func=lambda m: m.text == "✍️ Поиск по названию")
