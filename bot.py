@@ -1917,6 +1917,37 @@ def finish_replace_photos(message):
 def callback_handler(call):
     chat_id = call.message.chat.id
     data = call.data
+
+    if data == "noop":
+        bot.answer_callback_query(call.id)
+        return
+
+    if data.startswith("openbrowse_"):
+        raw = data.replace("openbrowse_", "", 1)
+
+        if "|" in raw:
+            mode_key, category = raw.split("|", 1)
+        else:
+            mode_key, category = raw, None
+
+        items = get_items_for_browse(mode_key, category=category)
+
+        if not items:
+            bot.answer_callback_query(call.id, "Объявлений нет")
+            return
+
+        chat_id = call.message.chat.id
+        user_index[chat_id] = 0
+
+        if category:
+            view_mode = f"browse_cat:{category}"
+        else:
+            view_mode = f"browse_{mode_key}"
+
+        set_view_state(chat_id, items[0][0], mode=view_mode)
+        show_item(chat_id, items[0], mode=view_mode, message_id=call.message.message_id)
+        bot.answer_callback_query(call.id)
+        return
     
     if data == "go_main":
         reset_filters(chat_id)
