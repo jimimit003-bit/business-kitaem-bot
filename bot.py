@@ -948,7 +948,7 @@ if mode == "favorites":
     return kb
 
     # ===== обычный режим =====
-    if True:
+    if owner_tg != viewer_tg:
         kb.row(
             types.InlineKeyboardButton("🚩", callback_data=f"report_{item_id}"),
             types.InlineKeyboardButton("💬", callback_data=f"write_{item_id}"),
