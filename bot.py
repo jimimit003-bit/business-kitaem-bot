@@ -994,6 +994,35 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
         )
         return kb
 
+def show_browse_section(chat_id, mode_key, category=None, title="📦 Раздел"):
+    items = get_items_for_browse(mode_key, category=category)
+
+    if not items:
+        bot.send_message(
+            chat_id,
+            f"В разделе «{title}» пока нет объявлений",
+            reply_markup=browse_menu()
+        )
+        return
+
+    count = len(items)
+
+    kb = types.InlineKeyboardMarkup()
+    open_key = mode_key if not category else f"{mode_key}|{category}"
+
+    kb.row(
+        types.InlineKeyboardButton(f"📊 Объявлений: {count}", callback_data="noop")
+    )
+    kb.row(
+        types.InlineKeyboardButton("▶️ Смотреть", callback_data=f"openbrowse_{open_key}")
+    )
+
+    bot.send_message(
+        chat_id,
+        f"{title}\n\nВыбери действие:",
+        reply_markup=kb
+    )
+
 def show_item(chat_id: int, item, count_view: bool = True, mode: str = "feed", message_id: Optional[int] = None):
     if not item:
         total_active = get_total_active_items()
