@@ -956,19 +956,27 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
         )
         return kb
 
-    # ===== просмотр своего объявления =====
-    kb.row(
-        types.InlineKeyboardButton("📦 В архив", callback_data=f"archive_{item_id}"),
-        types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}")
-    )
-    kb.row(
-        types.InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{item_id}"),
-        types.InlineKeyboardButton("📷 Заменить фото", callback_data=f"replacephoto_{item_id}")
-    )
-    kb.row(
-        types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
-    )
-    return kb
+        # ===== просмотр своего объявления =====
+        kb.row(
+            types.InlineKeyboardButton("◀️", callback_data=f"prevphoto_{item_id}"),
+            types.InlineKeyboardButton("▶️", callback_data=f"nextphoto_{item_id}")
+        )
+        kb.row(
+            types.InlineKeyboardButton("📦 В архив", callback_data=f"archive_{item_id}"),
+            types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}")
+        )
+        kb.row(
+            types.InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{item_id}"),
+            types.InlineKeyboardButton("📷 Заменить фото", callback_data=f"replacephoto_{item_id}")
+        )
+        kb.row(
+            types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
+        )
+        kb.row(
+            types.InlineKeyboardButton("🏠 Меню", callback_data="go_main"),
+            types.InlineKeyboardButton("➡️ Далее", callback_data="next_item")
+        )
+        return kb
 
 def show_item(chat_id: int, item, count_view: bool = True, mode: str = "feed", message_id: Optional[int] = None):
     if not item:
