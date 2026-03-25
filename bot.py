@@ -1335,12 +1335,16 @@ def open_browse_section(message):
     user_index[chat_id] = 0
 
     if category:
-        view_mode = f"browse_cat:{category}"
+        current_mode = f"browse_cat:{category}"
+    elif mode_key == "free":
+        current_mode = "browse_free"
+    elif mode_key == "cheap":
+        current_mode = "browse_cheap"
     else:
-        view_mode = f"browse_{mode_key}"
+        current_mode = "browse_all"
 
-    set_view_state(chat_id, items[0][0], mode=view_mode)
-    show_item(chat_id, items[0], mode=view_mode)
+    set_view_state(chat_id, items[0][0], mode=current_mode, photo_idx=0)
+    show_item(chat_id, items[0], mode=current_mode)
 
 
 @bot.message_handler(func=lambda m: m.text == "✍️ Поиск по названию")
