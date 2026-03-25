@@ -1862,8 +1862,9 @@ def create_subcategory_handler(message):
     else:
         bot.send_message(
             message.chat.id,
-            f"🖼 Теперь отправь до {MAX_PHOTOS_PER_ITEM} фото товара.\nМожно отправлять по одному.\nКогда закончишь, нажми «✅ Опубликовать»."
+            f"🖼 Теперь отправь до {MAX_PHOTOS_PER_ITEM} фото товара.\nМожно отправлять по одному.\nКогда закончишь, нажми «✅ Опубликовать».",
             reply_markup=photo_step_kb(0)
+        )
     
 @bot.message_handler(func=lambda m: m.chat.id in pending_create and pending_create[m.chat.id]["step"] == "photo" and m.text in ["✅ Опубликовать"]
 def create_finish_handler(message):
