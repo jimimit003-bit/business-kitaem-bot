@@ -1321,7 +1321,26 @@ def go_main_menu(message):
 def open_browse_section(message):
     chat_id = message.chat.id
     mode_key, category, title = BROWSE_TARGETS[message.text]
-    show_browse_section(chat_id, mode_key, category=category, title=title)
+
+    items = get_items_for_browse(mode_key, category=category)
+
+    if not items:
+        bot.send_message(
+            chat_id,
+            f"В разделе «{title}» пока нет объявлений",
+            reply_markup=browse_menu()
+        )
+        return
+
+    user_index[chat_id] = 0
+
+    if category:
+        view_mode = f"browse_cat:{category}"
+    else:
+        view_mode = f"browse_{mode_key}"
+
+    set_view_state(chat_id, items[0][0], mode=view_mode)
+    show_item(chat_id, items[0], mode=view_mode)
 
 
 @bot.message_handler(func=lambda m: m.text == "✍️ Поиск по названию")
