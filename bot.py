@@ -1856,7 +1856,7 @@ def create_subcategory_handler(message):
         pending_create[message.chat.id]["data"]["photos"] = []
         bot.send_message(
             message.chat.id,
-            f"🖼 Теперь можешь обновить фото.\nОтправь до {MAX_PHOTOS_PER_ITEM} фото по одному.\nКогда закончишь, нажми «✅ Сохранить фото»."
+            f"🖼 Теперь можешь обновить фото.\nОтправь до {MAX_PHOTOS_PER_ITEM} фото по одному.\nКогда закончишь, нажми «✅ Сохранить фото».",
             reply_markup=photo_step_kb(0)
         )
     else:
