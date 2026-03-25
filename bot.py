@@ -2059,7 +2059,7 @@ def callback_handler(call):
             items = get_items_for_browse("cheap")
         elif str(mode).startswith("browse_cat:"):
             category = mode.split(":", 1)[1]
-            items = get_items_for_browse(category)
+            items = get_items_for_browse("all", category=category)
         elif mode == "filtered":
             items = get_filtered_items(chat_id)
         else:
