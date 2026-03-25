@@ -1856,20 +1856,32 @@ def create_subcategory_handler(message):
         pending_create[message.chat.id]["data"]["photos"] = []
         bot.send_message(
             message.chat.id,
-            f"🖼 Теперь можешь обновить фото.\nОтправь до {MAX_PHOTOS_PER_ITEM} фото.\nЕсли фото менять не нужно — нажми «✅ Готово без фото».",
+            f"🖼 Теперь можешь обновить фото.\nОтправь до {MAX_PHOTOS_PER_ITEM} фото по одному.\nКогда закончишь, нажми «✅ Сохранить фото»."
             reply_markup=photo_step_kb(0)
         )
     else:
         bot.send_message(
             message.chat.id,
-            f"🖼 Теперь отправь до {MAX_PHOTOS_PER_ITEM} фото товара.\nМожно отправлять по одному.\nЕсли фото не нужно — нажми «✅ Готово без фото».",
+            f"🖼 Теперь отправь до {MAX_PHOTOS_PER_ITEM} фото товара.\nМожно отправлять по одному.\nКогда закончишь, нажми «✅ Опубликовать»."
+            reply_markup=photo_step_kb(0)
+    
+@bot.message_handler(func=lambda m: m.chat.id in pending_create and pending_create[m.chat.id]["step"] == "photo" and m.text in ["✅ Опубликовать"]
+def create_finish_handler(message):
+    chat_id = message.chat.id
+
+    if chat_id not in pending_create:
+        return
+
+    photos = pending_create[chat_id]["data"].get("photos", [])
+    if not photos:
+        bot.send_message(
+            chat_id,
+            "📸 Сначала добавь хотя бы 1 фото товара.",
             reply_markup=photo_step_kb(0)
         )
+        return
 
-
-@bot.message_handler(func=lambda m: m.chat.id in pending_create and pending_create[m.chat.id]["step"] == "photo" and m.text in ["✅ Готово без фото", "✅ Опубликовать"])
-def create_finish_handler(message):
-    finish_create(message.chat.id)
+    finish_create(chat_id)
 
 
 @bot.message_handler(content_types=["photo"])
