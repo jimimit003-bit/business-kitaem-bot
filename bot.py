@@ -817,10 +817,10 @@ def subcategory_pick_kb(category: str):
 
 def photo_step_kb(photo_count: int = 0):
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    if photo_count == 0:
-        kb.row("✅ Готово без фото")
-    else:
+
+    if photo_count > 0:
         kb.row("✅ Опубликовать")
+
     kb.row("❌ Отмена")
     return kb
 
