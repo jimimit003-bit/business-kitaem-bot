@@ -2027,6 +2027,16 @@ def callback_handler(call):
                 if item and item[8] == 0:
                     items.append(item)
 
+        elif mode == "search":
+            query_text = state.get("query_text", "") if state else ""
+            rows = search_items_by_title(query_text)
+
+            items = []
+            for row in rows:
+                item = get_item_by_id(row[0])
+                if item and item[8] == 0:
+                    items.append(item)
+
         elif mode == "browse_all":
             items = get_items_for_browse("all")
         elif mode == "browse_free":
