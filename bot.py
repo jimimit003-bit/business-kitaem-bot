@@ -2060,6 +2060,9 @@ def callback_handler(call):
         user_index[chat_id] = idx
 
         set_view_state(chat_id, items[idx][0], mode=mode, photo_idx=0)
+        if mode == "search":
+            view_state[chat_id]["query_text"] = query_text
+            
         show_item(chat_id, items[idx], mode=mode, message_id=call.message.message_id)
 
         bot.answer_callback_query(call.id)
@@ -2112,6 +2115,8 @@ def callback_handler(call):
         user_index[chat_id] = idx
 
         set_view_state(chat_id, items[idx][0], mode=mode, photo_idx=0)
+        if mode == "search":
+            view_state[chat_id]["query_text"] = query_text
 
         # новое сообщение, а не редактирование старого
         show_item(chat_id, items[idx], mode=mode, message_id=None)
