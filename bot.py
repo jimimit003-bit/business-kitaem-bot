@@ -742,11 +742,18 @@ def get_user_profile_text(chat_id: int) -> str:
 
 
 def set_view_state(chat_id: int, item_id: int, mode: str = "feed", photo_idx: int = 0):
-    view_state[chat_id] = {
+    old_state = view_state.get(chat_id, {})
+
+    new_state = {
         "item_id": item_id,
         "mode": mode,
         "photo_idx": photo_idx
     }
+
+    if mode == "search":
+        new_state["query_text"] = old_state.get("query_text", "")
+
+    view_state[chat_id] = new_state
 
 
 def get_view_state(chat_id: int):
