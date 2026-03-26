@@ -1596,7 +1596,8 @@ def search_text_handler(message):
         return
 
     user_index[chat_id] = 0
-    set_view_state(chat_id, rows[0][0], mode="search")
+    set_view_state(chat_id, rows[0][0], mode="search", photo_idx=0)
+    view_state[chat_id]["query_text"] = query_text
     show_item(chat_id, rows[0], mode="search")
     
 def search_items_by_title(query):
@@ -2065,6 +2066,16 @@ def callback_handler(call):
             items = []
             for fav_item_id in fav_ids:
                 item = get_item_by_id(fav_item_id) 
+                if item and item[8] == 0:
+                    items.append(item)
+
+        elif mode == "search":
+            query_text = state.get("query_text", "") if state else ""
+            rows = search_items_by_title(query_text)
+
+            items = []
+            for row in rows:
+                item = get_item_by_id(row[0])
                 if item and item[8] == 0:
                     items.append(item)
 
