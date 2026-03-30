@@ -772,7 +772,7 @@ def main_menu():
 
 def submenu_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.row("📦 Мои объявления", "📦 Архив")
+    kb.row("📦 Мои объявления", "🗂️ Архив")
     kb.row("📜 Правила", "❤️ Избранное")
     kb.row("🆘 Помощь", "📊 Статистика")
     kb.row("⬅ Назад", "🎁 Пригласить друга")
