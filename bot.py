@@ -1517,7 +1517,7 @@ def stats_menu(message):
 
     bot.send_message(chat_id, text, reply_markup=submenu_menu())
 
-@bot.message_handler(func=lambda m: m.text == "🎁 Пригласить")
+@bot.message_handler(func=lambda m: m.text == "🎁 Пригласить друга")
 def invite_menu(message):
     me = bot.get_me()
     invite_link = f"https://t.me/{me.username}?start=ref_{message.chat.id}"
