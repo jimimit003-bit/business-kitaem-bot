@@ -1155,6 +1155,8 @@ def show_archive_item(chat_id: int, item_id: int):
     text = item_to_text(item) + "\n\n🗂 В архиве"
     photos = get_item_photos(item_id)
 
+    set_view_state(chat_id, item_id, mode="archive", photo_idx=0)
+
     kb = types.InlineKeyboardMarkup()
     kb.row(
         types.InlineKeyboardButton("♻️ Вернуть", callback_data=f"restore_{item_id}"),
