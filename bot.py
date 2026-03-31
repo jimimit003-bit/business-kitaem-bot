@@ -2275,8 +2275,27 @@ def callback_handler(call):
         return
 
     if data.startswith("taken_"):
-        bot.answer_callback_query(call.id, "Нажатие поймано")
-        bot.send_message(chat_id, f"DEBUG taken: {data}")
+        item_id = int(data.split("_")[1])
+
+        if mark_taken(item_id, chat_id):
+            bot.answer_callback_query(call.id, "📦 Объявление в архиве")
+
+            rows = get_user_items(chat_id)
+            active_items = [x for x in rows if x[8] == 0]
+
+            if active_items:
+                user_index[chat_id] = 0
+                set_view_state(chat_id, active_items[0][0], mode="my", photo_idx=0)
+                show_item(chat_id, active_items[0], count_view=False, mode="my")
+            else:
+                bot.send_message(
+                    chat_id,
+                    "📦 Объявление отправлено в архив.\nУ тебя больше нет активных объявлений.",
+                    reply_markup=submenu_menu()
+                )
+        else:
+            bot.answer_callback_query(call.id, "Ошибка архивации")
+
         return
 
     if data.startswith("restore_"):
