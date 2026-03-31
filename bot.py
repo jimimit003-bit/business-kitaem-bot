@@ -2295,11 +2295,49 @@ def callback_handler(call):
     if data.startswith("delete_"):
         item_id = int(data.split("_")[1])
 
+        state = get_view_state(chat_id)
+        mode = state.get("mode", "") if state else ""
+
         if delete_item(item_id, chat_id):
-            bot.answer_callback_query(call.id, "Удалено 🗑")
-            bot.send_message(chat_id, "Объявление удалено", reply_markup=main_menu())
+            bot.answer_callback_query(call.id, "Удалено")
+
+            if mode == "archive":
+                rows = get_user_archive_items(chat_id)
+
+                if rows:
+                    user_index[chat_id] = 0
+                    show_archive_item(chat_id, rows[0][0])
+                else:
+                    bot.send_message(
+                        chat_id,
+                        "🗂️ Архив пуст.",
+                        reply_markup=submenu_menu()
+                    )
+
+            elif mode == "my":
+                rows = get_user_active_items(chat_id)
+
+                if rows:
+                    user_index[chat_id] = 0
+                    set_view_state(chat_id, rows[0][0], mode="my", photo_idx=0)
+                    show_item(chat_id, rows[0], count_view=False, mode="my")
+                else:
+                    bot.send_message(
+                        chat_id,
+                        "У тебя пока нет активных объявлений",
+                        reply_markup=submenu_menu()
+                    )
+
+            else:
+                bot.send_message(
+                    chat_id,
+                    "Объявление удалено",
+                    reply_markup=submenu_menu()
+                )
+
         else:
             bot.answer_callback_query(call.id, "Ошибка")
+
         return
 
     if data.startswith("taken_"):
