@@ -947,7 +947,7 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
     )
 
     kb.row(
-        types.InlineKeyboardButton("📦 В архив", callback_data=f"taken_{item_id}"),
+        types.InlineKeyboardButton("🗂️ В архив", callback_data=f"taken_{item_id}"),
         types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}")
     )
 
@@ -984,7 +984,7 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
             types.InlineKeyboardButton("▶️", callback_data=f"nextphoto_{item_id}")
         )
         kb.row(
-            types.InlineKeyboardButton("📦 В архив", callback_data=f"taken_{item_id}"),
+            types.InlineKeyboardButton("🗂️ В архив", callback_data=f"taken_{item_id}"),
             types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}")
         )
         kb.row(
@@ -1000,7 +1000,7 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
         )
         return kb
 
-def show_browse_section(chat_id, mode_key, category=None, title="📦 Раздел"):
+def show_browse_section(chat_id, mode_key, category=None, title="🗂️ Раздел"):
     items = get_items_for_browse(mode_key, category=category)
 
     if not items:
@@ -1467,7 +1467,7 @@ def my_items_menu(message):
     bot.send_message(chat_id, "📦 Мои объявления:", reply_markup=kb)
 
 
-@bot.message_handler(func=lambda m: m.text == "📦 Архив")
+@bot.message_handler(func=lambda m: m.text == "🗂️ Архив")
 def archive_menu_handler(message):
     chat_id = message.chat.id
     rows = get_user_archive_items(chat_id)
@@ -1475,7 +1475,7 @@ def archive_menu_handler(message):
     if not rows:
         bot.send_message(
             chat_id,
-            "📦 В архиве пока ничего нет.",
+            "🗂️ В архиве пока ничего нет.",
             reply_markup=submenu_menu()
         )
         return
@@ -1486,14 +1486,14 @@ def archive_menu_handler(message):
         title = item[1] or f"Объявление #{item_id}"
         kb.row(
             types.InlineKeyboardButton(
-                f"📦 {title}",
+                f"🗂️ {title}",
                 callback_data=f"architem_{item_id}"
             )
         )
 
     bot.send_message(
         chat_id,
-        "📦 Архивные объявления:",
+        "🗂️ Архивные объявления:",
         reply_markup=kb
     )
 
@@ -2295,7 +2295,7 @@ def callback_handler(call):
         item_id = int(data.split("_")[1])
 
         if mark_taken(item_id, chat_id):
-            bot.answer_callback_query(call.id, "📦 Объявление в архиве")
+            bot.answer_callback_query(call.id, "🗂️ Объявление в архиве")
 
             rows = get_user_items(chat_id)
             active_items = [x for x in rows if x[8] == 0]
@@ -2307,7 +2307,7 @@ def callback_handler(call):
             else:
                 bot.send_message(
                     chat_id,
-                    "📦 Объявление отправлено в архив.\nУ тебя больше нет активных объявлений.",
+                    "🗂️ Объявление отправлено в архив.\nУ тебя больше нет активных объявлений.",
                     reply_markup=submenu_menu()
                 )
         else:
