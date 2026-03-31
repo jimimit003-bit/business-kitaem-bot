@@ -2277,13 +2277,12 @@ def callback_handler(call):
     if data.startswith("taken_"):
         item_id = int(data.split("_")[1])
 
-        user_id = call.from_user.id
-
-        if mark_taken(item_id, user_id):
-            bot.answer_callback_query(call.id, "Перенесено в архив ✅")
-            bot.send_message(chat_id, "Объявление отправлено в архив", reply_markup=main_menu())
+        if mark_taken(item_id, chat_id):
+            bot.answer_callback_query(call.id, "📦 В архив")
+            bot.send_message(chat_id, "📦 Объявление отправлено в архив")
         else:
-            bot.answer_callback_query(call.id, "Ошибка")
+            bot.answer_callback_query(call.id, "Ошибка архивации")
+
         return
 
     if data.startswith("restore_"):
