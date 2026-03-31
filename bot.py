@@ -1568,22 +1568,6 @@ def rules_menu(message):
 
     bot.send_message(message.chat.id, text, reply_markup=submenu_menu())
 
-@bot.message_handler(func=lambda m: m.text == "🔥 Популярное")
-def popular_menu(message):
-    rows = get_popular_items(10)
-
-    if not rows:
-        bot.send_message(message.chat.id, "Пока нет популярных объявлений", reply_markup=submenu_menu())
-        return
-
-    kb = types.InlineKeyboardMarkup()
-    for row in rows:
-        item_id = row[0]
-        title = row[1]
-        kb.row(types.InlineKeyboardButton(f"#{item_id} {title}", callback_data=f"popular_{item_id}"))
-
-    bot.send_message(message.chat.id, "🔥 Популярное:", reply_markup=kb)
-
 
 @bot.message_handler(func=lambda m: m.chat.id in pending_search and m.chat.id not in pending_create)
 def search_text_handler(message):
