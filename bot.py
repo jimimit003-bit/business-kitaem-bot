@@ -1162,9 +1162,20 @@ def show_archive_item(chat_id: int, item_id: int):
     )
 
     if photos:
-        bot.send_photo(chat_id, photos[0], caption=text, reply_markup=kb)
+        bot.send_photo(
+            chat_id,
+            photos[0],
+            caption=text,
+            reply_markup=kb,
+            parse_mode="HTML"
+        )
     else:
-        bot.send_message(chat_id, text, reply_markup=kb)
+        bot.send_message(
+            chat_id,
+            text,
+            reply_markup=kb,
+            parse_mode="HTML"
+        )
 
 
 # =========================
