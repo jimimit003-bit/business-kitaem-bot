@@ -1467,7 +1467,7 @@ def my_items_menu(message):
     bot.send_message(chat_id, "📦 Мои объявления:", reply_markup=kb)
 
 
-@bot.message_handler(func=lambda m: m.text == "🗂 Архив")
+@bot.message_handler(func=lambda m: m.text == "📦 Архив")
 def archive_menu_handler(message):
     chat_id = message.chat.id
     rows = get_user_archive_items(chat_id)
@@ -1475,10 +1475,27 @@ def archive_menu_handler(message):
     if not rows:
         bot.send_message(
             chat_id,
-            f"По запросу «{query_text}» ничего не найдено",
-            reply_markup=main_menu()
+            "📦 В архиве пока ничего нет.",
+            reply_markup=submenu_menu()
         )
         return
+
+    kb = types.InlineKeyboardMarkup()
+    for item in rows[:20]:
+        item_id = item[0]
+        title = item[1] or f"Объявление #{item_id}"
+        kb.row(
+            types.InlineKeyboardButton(
+                f"📦 {title}",
+                callback_data=f"architem_{item_id}"
+            )
+        )
+
+    bot.send_message(
+        chat_id,
+        "📦 Архивные объявления:",
+        reply_markup=kb
+    )
 
 
 @bot.message_handler(func=lambda m: m.text == "👤 Профиль")
