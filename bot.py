@@ -941,29 +941,7 @@ def show_filters_menu(chat_id: int, notice: Optional[str] = None):
 def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
     kb = types.InlineKeyboardMarkup()
 
-    kb.row(
-        types.InlineKeyboardButton("◀️", callback_data=f"prevphoto_{item_id}"),
-        types.InlineKeyboardButton("▶️", callback_data=f"nextphoto_{item_id}")
-    )
-
-    kb.row(
-        types.InlineKeyboardButton("🗂️ В архив", callback_data=f"taken_{item_id}"),
-        types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}")
-    )
-
-    kb.row(
-        types.InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{item_id}"),
-        types.InlineKeyboardButton("📷 Заменить фото", callback_data=f"replacephoto_{item_id}")
-    )
-
-    kb.row(
-        types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}"),
-        types.InlineKeyboardButton("➡️ Далее", callback_data="next_item")
-    )
-
-    return kb
-
-    # ===== обычный просмотр чужого объявления =====
+    # ===== просмотр чужого объявления =====
     if owner_tg != viewer_tg:
         kb.row(
             types.InlineKeyboardButton("🚩", callback_data=f"report_{item_id}"),
@@ -978,27 +956,27 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
         )
         return kb
 
-        # ===== просмотр своего объявления =====
-        kb.row(
-            types.InlineKeyboardButton("◀️", callback_data=f"prevphoto_{item_id}"),
-            types.InlineKeyboardButton("▶️", callback_data=f"nextphoto_{item_id}")
-        )
-        kb.row(
-            types.InlineKeyboardButton("🗂️ В архив", callback_data=f"taken_{item_id}"),
-            types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}")
-        )
-        kb.row(
-            types.InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{item_id}"),
-            types.InlineKeyboardButton("📷 Заменить фото", callback_data=f"replacephoto_{item_id}")
-        )
-        kb.row(
-            types.InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{item_id}")
-        )
-        kb.row(
-            types.InlineKeyboardButton("🏠 Меню", callback_data="go_main"),
-            types.InlineKeyboardButton("➡️ Далее", callback_data="next_item")
-        )
-        return kb
+    # ===== просмотр своего объявления =====
+    kb.row(
+        types.InlineKeyboardButton("◀️", callback_data=f"prevphoto_{item_id}"),
+        types.InlineKeyboardButton("▶️", callback_data=f"nextphoto_{item_id}")
+    )
+    kb.row(
+        types.InlineKeyboardButton("🗂️ В архив", callback_data=f"taken_{item_id}"),
+        types.InlineKeyboardButton("🚀 Поднять", callback_data=f"bump_{item_id}")
+    )
+    kb.row(
+        types.InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{item_id}"),
+        types.InlineKeyboardButton("📷 Заменить фото", callback_data=f"replacephoto_{item_id}")
+    )
+    kb.row(
+        types.InlineKeyboardButton("🗑️ Удалить", callback_data=f"delete_{item_id}"),
+        types.InlineKeyboardButton("➡️ Далее", callback_data="next_item")
+    )
+    kb.row(
+        types.InlineKeyboardButton("🏠 Меню", callback_data="go_main")
+    )
+    return kb
 
 def show_browse_section(chat_id, mode_key, category=None, title="🗂️ Раздел"):
     items = get_items_for_browse(mode_key, category=category)
