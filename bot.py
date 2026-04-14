@@ -2165,7 +2165,28 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "❤️ Добавлено в избранное")
 
         return
-  
+    if data.startswith("write_"):
+        item_id = int(data.split("_")[1])
+        item = get_item_by_id(item_id)
+
+        if not item:
+            bot.answer_callback_query(call.id, "Объявление не найдено")
+            return
+
+        owner_tg = item[6]
+
+        if owner_tg == chat_id:
+            bot.answer_callback_query(call.id, "Это твоё объявление")
+            return
+
+        bot.answer_callback_query(call.id)
+
+        bot.send_message(
+            chat_id,
+            f"💬 Чтобы написать продавцу, открой чат:\n\ntg://user?id={owner_tg}"
+        )
+        return
+        
     if call.data.startswith("report_"):
         item_id = int(call.data.split("_")[1])
 
