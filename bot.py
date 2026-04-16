@@ -945,7 +945,7 @@ def build_card_keyboard(item_id: int, viewer_tg: int, owner_tg: int):
     if owner_tg != viewer_tg:
         kb.row(
             types.InlineKeyboardButton("🚩", callback_data=f"report_{item_id}"),
-            types.InlineKeyboardButton("💬", callback_data=f"write_{item_id}"),
+            types.InlineKeyboardButton("💬", url=f"tg://user?id={owner_tg}"),
             types.InlineKeyboardButton("❤️", callback_data=f"fav_{item_id}"),
             types.InlineKeyboardButton("◀️", callback_data=f"prevphoto_{item_id}"),
             types.InlineKeyboardButton("▶️", callback_data=f"nextphoto_{item_id}")
@@ -2164,27 +2164,6 @@ def callback_handler(call):
             add_favorite(user_id, item_id)
             bot.answer_callback_query(call.id, "❤️ Добавлено в избранное")
 
-        return
-    if data.startswith("write_"):
-        item_id = int(data.split("_")[1])
-        item = get_item_by_id(item_id)
-
-        if not item:
-            bot.answer_callback_query(call.id, "Объявление не найдено")
-            return
-
-        owner_tg = item[6]
-
-        if owner_tg == chat_id:
-            bot.answer_callback_query(call.id, "Это твоё объявление")
-            return
-
-        bot.answer_callback_query(call.id)
-
-        bot.send_message(
-            chat_id,
-            f"💬 Чтобы написать продавцу, открой чат:\n\ntg://user?id={owner_tg}"
-        )
         return
         
     if call.data.startswith("report_"):
