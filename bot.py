@@ -292,6 +292,32 @@ def get_item_by_id(item_id: int):
     """, (item_id,))
     return cursor.fetchone()
 
+def build_share_text(item_id: int) -> str:
+    item = get_item_by_id(item_id)
+    if not item:
+        return "Объявление не найдено"
+
+    title = item[1] or "Без названия"
+    price = item[2] or 0
+    city = item[3] or "Не указан"
+    category = item[4] or "Другое"
+    subcategory = item[5] or ""
+
+    if price == 0:
+        price_text = "Бесплатно"
+    else:
+        price_text = f"{price} ₽"
+
+    text = (
+        f"📢 Объявление в Даром\n\n"
+        f"👕 {title}\n"
+        f"{subcategory}\n"
+        f"💰 {price_text}\n"
+        f"📍 {city}\n"
+        f"📦 {category}\n\n"
+        f"Смотри объявление в боте «Даром»."
+    )
+    return text
 
 def get_total_active_items() -> int:
     cursor.execute("SELECT COUNT(*) FROM items WHERE is_taken = 0")
