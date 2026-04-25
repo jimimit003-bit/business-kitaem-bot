@@ -148,11 +148,18 @@ conn.commit()
 
 
 def ensure_column(table_name: str, column_name: str, column_def: str):
-    cursor.execute(f"PRAGMA table_info({table_name})")
-    columns = [row[1] for row in cursor.fetchall()]
-    if column_name not in columns:
-        cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_def}")
-        conn.commit()
+    cursor.execute("""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = %s AND column_name = %s
+    """, (table_name, column_name))
+
+    exists = cursor.fetchone()
+
+    if not exists:
+        cursor.execute(
+            f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_def}"
+        )
 
 
 ensure_column("items", "subcategory", "TEXT NOT NULL DEFAULT ''")
