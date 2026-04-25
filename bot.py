@@ -1,6 +1,6 @@
 import os
 import time
-import sqlite3
+import psycopg2
 from typing import Optional, List, Dict
 
 import telebot
@@ -68,7 +68,10 @@ MAX_PHOTOS_PER_ITEM = 5
 # =========================
 # DB
 # =========================
-conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+conn = psycopg2.connect(DATABASE_URL)
+conn.autocommit = True
 cursor = conn.cursor()
 
 cursor.execute("""
