@@ -252,7 +252,7 @@ def add_item(title: str, price: int, city: str, category: str, subcategory: str,
             title, price, city, category, subcategory, owner_tg,
             views, is_taken, bump_count, last_bump_at, created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, 0, 0, 0, 0, %s)
     """, (title, price, city, category, subcategory, owner_tg, now_ts()))
     conn.commit()
     return cursor.lastrowid
@@ -262,13 +262,13 @@ def add_item_photos(item_id: int, photo_ids: List[str]):
     for idx, photo_id in enumerate(photo_ids[:MAX_PHOTOS_PER_ITEM]):
         cursor.execute("""
             INSERT INTO item_photos (item_id, photo_id, position)
-            VALUES (?, ?, ?)
+            VALUES (%s, %s, %s)
         """, (item_id, photo_id, idx))
     conn.commit()
 
 
 def replace_item_photos(item_id: int, photo_ids: List[str]):
-    cursor.execute("DELETE FROM item_photos WHERE item_id = ?", (item_id,))
+    cursor.execute("DELETE FROM item_photos WHERE item_id = %s", (item_id,))
     conn.commit()
     add_item_photos(item_id, photo_ids)
 
@@ -277,7 +277,7 @@ def get_item_photos(item_id: int) -> List[str]:
     cursor.execute("""
         SELECT photo_id
         FROM item_photos
-        WHERE item_id = ?
+        WHERE item_id = %s
         ORDER BY position ASC, id ASC
     """, (item_id,))
     return [row[0] for row in cursor.fetchall()]
