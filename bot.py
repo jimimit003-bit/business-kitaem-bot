@@ -677,7 +677,10 @@ def add_report(reporter_tg: int, item_id: int, reason: str = "Жалоба"):
 
 
 def get_reports_count(item_id: int) -> int:
-    cursor.execute("SELECT COUNT(*) FROM reports WHERE item_id = ?", (item_id,))
+    cursor.execute(
+        "SELECT COUNT(*) FROM reports WHERE item_id = %s",
+        (item_id,)
+    )
     row = cursor.fetchone()
     return row[0] if row else 0
 
