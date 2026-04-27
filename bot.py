@@ -253,9 +253,10 @@ def add_item(title: str, price: int, city: str, category: str, subcategory: str,
             views, is_taken, bump_count, last_bump_at, created_at
         )
         VALUES (%s, %s, %s, %s, %s, %s, 0, 0, 0, 0, %s)
+        RETURNING id
     """, (title, price, city, category, subcategory, owner_tg, now_ts()))
     conn.commit()
-    return cursor.lastrowid
+    return cursor.fetchone()[0]
 
 
 def add_item_photos(item_id: int, photo_ids: List[str]):
@@ -286,8 +287,8 @@ def get_item_photos(item_id: int) -> List[str]:
 def update_item(item_id: int, owner_tg: int, title: str, price: int, city: str, category: str, subcategory: str) -> bool:
     cursor.execute("""
         UPDATE items
-        SET title = ?, price = ?, city = ?, category = ?, subcategory = ?
-        WHERE id = ? AND owner_tg = ?
+        SET title = %s, price = %s, city = %s, category = %s, subcategory = %s
+        WHERE id = %s AND owner_tg = %s
     """, (title, price, city, category, subcategory, item_id, owner_tg))
     conn.commit()
     return cursor.rowcount > 0
@@ -298,7 +299,7 @@ def get_item_by_id(item_id: int):
         SELECT id, title, price, city, category, subcategory, owner_tg,
                views, is_taken, bump_count, last_bump_at, created_at
         FROM items
-        WHERE id = ?
+        WHERE id = %s
     """, (item_id,))
     return cursor.fetchone()
 
