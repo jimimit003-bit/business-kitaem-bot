@@ -611,7 +611,10 @@ def get_likes_count(item_id: int) -> int:
 
 
 def add_view(item_id: int):
-    cursor.execute("UPDATE items SET views = views + 1 WHERE id = ?", (item_id,))
+    cursor.execute(
+        "UPDATE items SET views = views + 1 WHERE id = %s",
+        (item_id,)
+    )
     conn.commit()
 
 
