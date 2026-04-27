@@ -213,13 +213,17 @@ def reset_filters(chat_id: int):
 
 def get_user_id(telegram_id: int) -> int:
     cursor.execute(
-        "INSERT OR IGNORE INTO users (telegram_id) VALUES (?)",
+        """
+        INSERT INTO users (telegram_id)
+        VALUES (%s)
+        ON CONFLICT (telegram_id) DO NOTHING
+        """,
         (telegram_id,)
     )
     conn.commit()
 
     cursor.execute(
-        "SELECT id FROM users WHERE telegram_id = ?",
+        "SELECT id FROM users WHERE telegram_id = %s",
         (telegram_id,)
     )
     row = cursor.fetchone()
@@ -231,7 +235,11 @@ def add_referral(inviter_tg: int, invited_tg: int):
         return
 
     cursor.execute(
-        "INSERT OR IGNORE INTO referrals (inviter_tg, invited_tg) VALUES (?, ?)",
+        """
+        INSERT INTO referrals (inviter_tg, invited_tg)
+        VALUES (%s, %s)
+        ON CONFLICT DO NOTHING
+        """,
         (inviter_tg, invited_tg)
     )
     conn.commit()
@@ -239,14 +247,14 @@ def add_referral(inviter_tg: int, invited_tg: int):
 
 def get_referrals_count(inviter_tg: int) -> int:
     cursor.execute(
-        "SELECT COUNT(*) FROM referrals WHERE inviter_tg = ?",
+        "SELECT COUNT(*) FROM referrals WHERE inviter_tg = %s",
         (inviter_tg,)
     )
     row = cursor.fetchone()
     return row[0] if row else 0
 
 
-def add_item(title: str, price: int, city: str, category: str, subcategory: str, owner_tg: int) -> int:
+def add_item(title: str, price: int, city: str, category: str, subcategory: str, owner_tg: int):
     cursor.execute("""
         INSERT INTO items (
             title, price, city, category, subcategory, owner_tg,
@@ -255,8 +263,10 @@ def add_item(title: str, price: int, city: str, category: str, subcategory: str,
         VALUES (%s, %s, %s, %s, %s, %s, 0, 0, 0, 0, %s)
         RETURNING id
     """, (title, price, city, category, subcategory, owner_tg, now_ts()))
+
+    item_id = cursor.fetchone()[0]
     conn.commit()
-    return cursor.fetchone()[0]
+    return item_id
 
 
 def add_item_photos(item_id: int, photo_ids: List[str]):
