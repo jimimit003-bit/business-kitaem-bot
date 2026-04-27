@@ -411,8 +411,18 @@ def get_items_for_browse(mode: str, category: Optional[str] = None):
     else:
         query += " ORDER BY id DESC"
 
-    cursor.execute(query, tuple(params))
-    return cursor.fetchall()
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+
+        unique = []
+        seen = set()
+
+        for item in rows:
+            if item[0] not in seen:
+                seen.add(item[0])
+                unique.append(item)
+
+        return unique
 
 
 def get_user_items(owner_tg: int):
