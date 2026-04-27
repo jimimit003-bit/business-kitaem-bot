@@ -459,7 +459,7 @@ def mark_taken(item_id: int, owner_tg: int) -> bool:
     cursor.execute("""
         UPDATE items
         SET is_taken = 1
-        WHERE id = ? AND owner_tg = ?
+        WHERE id = %s AND owner_tg = %s
     """, (item_id, owner_tg))
     conn.commit()
     return cursor.rowcount > 0
