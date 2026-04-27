@@ -395,7 +395,7 @@ def get_items_for_browse(mode: str, category: Optional[str] = None):
         query += " AND price > 0 AND price <= 400"
 
     if category:
-        query += " AND category = ?"
+        query += " AND category = %s"
         params.append(category)
 
     if mode == "all":
