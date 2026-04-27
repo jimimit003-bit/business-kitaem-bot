@@ -479,7 +479,7 @@ def can_bump_item(item_id: int, owner_tg: int):
     cursor.execute("""
         SELECT last_bump_at
         FROM items
-        WHERE id = ? AND owner_tg = ?
+        WHERE id = %s AND owner_tg = %s
     """, (item_id, owner_tg))
     row = cursor.fetchone()
     if not row:
