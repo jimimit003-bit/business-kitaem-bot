@@ -671,7 +671,7 @@ def get_popular_items(limit: int = 10):
 def add_report(reporter_tg: int, item_id: int, reason: str = "Жалоба"):
     cursor.execute("""
         INSERT INTO reports (reporter_tg, item_id, reason, created_at)
-        VALUES (?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s)
     """, (reporter_tg, item_id, reason, now_ts()))
     conn.commit()
 
