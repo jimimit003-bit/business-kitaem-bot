@@ -430,7 +430,7 @@ def get_user_items(owner_tg: int):
         SELECT id, title, price, city, category, subcategory, owner_tg,
                views, is_taken, bump_count, last_bump_at, created_at
         FROM items
-        WHERE owner_tg = ?
+        WHERE owner_tg = %s
         ORDER BY id DESC
     """, (owner_tg,))
     return cursor.fetchall()
@@ -441,7 +441,7 @@ def get_user_active_items(owner_tg: int):
         SELECT id, title, price, city, category, subcategory, owner_tg,
                views, is_taken, bump_count, last_bump_at, created_at
         FROM items
-        WHERE owner_tg = ? AND is_taken = 0
+        WHERE owner_tg = %s AND is_taken = 0
         ORDER BY id DESC
     """, (owner_tg,))
     return cursor.fetchall()
@@ -452,7 +452,7 @@ def get_user_archive_items(owner_tg: int):
         SELECT id, title, price, city, category, subcategory, owner_tg,
                views, is_taken, bump_count, last_bump_at, created_at
         FROM items
-        WHERE owner_tg = ? AND is_taken = 1
+        WHERE owner_tg = %s AND is_taken = 1
         ORDER BY id DESC
     """, (owner_tg,))
     return cursor.fetchall()
@@ -479,7 +479,7 @@ def restore_item(item_id: int, owner_tg: int) -> bool:
     cursor.execute("""
         UPDATE items
         SET is_taken = 0
-        WHERE id = ? AND owner_tg = ?
+        WHERE id = %s AND owner_tg = %s
     """, (item_id, owner_tg))
     conn.commit()
     return cursor.rowcount > 0
@@ -512,7 +512,7 @@ def bump_item(item_id: int, owner_tg: int):
         SELECT title, price, city, category, subcategory, owner_tg,
                views, is_taken, bump_count, created_at
         FROM items
-        WHERE id = ? AND owner_tg = ?
+        WHERE id = %s AND owner_tg = %s
     """, (item_id, owner_tg))
     row = cursor.fetchone()
     if not row:
@@ -542,7 +542,7 @@ def bump_item(item_id: int, owner_tg: int):
             title, price, city, category, subcategory, owner_tg,
             views, is_taken, bump_count, last_bump_at, created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         title, price, city, category, subcategory, owner_tg,
         views, is_taken, bump_count + 1, now_ts(), created_at
@@ -554,20 +554,20 @@ def bump_item(item_id: int, owner_tg: int):
 
     for like_row in likes_rows:
         cursor.execute(
-            "INSERT OR IGNORE INTO likes (user_id, item_id) VALUES (?, ?)",
+            INSERT INTO likes (...) VALUES (%s, %s) ON CONFLICT DO NOTHING
             (like_row[0], new_item_id)
         )
 
     for fav_row in fav_rows:
         cursor.execute(
-            "INSERT OR IGNORE INTO favorites (user_id, item_id) VALUES (?, ?)",
+            INSERT INTO favorites (...) VALUES (%s, %s) ON CONFLICT DO NOTHING
             (fav_row[0], new_item_id)
         )
 
     for reporter_tg, reason, created_at_value in report_rows:
         cursor.execute("""
             INSERT INTO reports (reporter_tg, item_id, reason, created_at)
-            VALUES (?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s)
         """, (reporter_tg, new_item_id, reason, created_at_value))
 
     conn.commit()
@@ -576,33 +576,50 @@ def bump_item(item_id: int, owner_tg: int):
 
 def add_favorite(user_id: int, item_id: int):
     cursor.execute(
-        "INSERT OR IGNORE INTO favorites (user_id, item_id) VALUES (?, ?)",
-        (user_id, item_id)
-    )
-    conn.commit()
-def remove_favorite(user_id: int, item_id: int):
-    cursor.execute(
-        "DELETE FROM favorites WHERE user_id = ? AND item_id = ?",
+        """
+        INSERT INTO favorites (user_id, item_id)
+        VALUES (%s, %s)
+        ON CONFLICT DO NOTHING
+        """,
         (user_id, item_id)
     )
     conn.commit()
 
+
+def remove_favorite(user_id: int, item_id: int):
+    cursor.execute(
+        "DELETE FROM favorites WHERE user_id = %s AND item_id = %s",
+        (user_id, item_id)
+    )
+    conn.commit()
+
+
 def get_favorites(user_id: int):
-    cursor.execute("SELECT item_id FROM favorites WHERE user_id = ?", (user_id,))
+    cursor.execute(
+        "SELECT item_id FROM favorites WHERE user_id = %s",
+        (user_id,)
+    )
     rows = cursor.fetchall()
     return [r[0] for r in rows]
 
 
 def add_like(user_id: int, item_id: int):
     cursor.execute(
-        "INSERT OR IGNORE INTO likes (user_id, item_id) VALUES (?, ?)",
+        """
+        INSERT INTO likes (user_id, item_id)
+        VALUES (%s, %s)
+        ON CONFLICT DO NOTHING
+        """,
         (user_id, item_id)
     )
     conn.commit()
 
 
 def remove_like(user_id: int, item_id: int):
-    cursor.execute("DELETE FROM likes WHERE user_id = ? AND item_id = ?", (user_id, item_id))
+    cursor.execute(
+        "DELETE FROM likes WHERE user_id = %s AND item_id = %s",
+        (user_id, item_id)
+    )
     conn.commit()
 
 
