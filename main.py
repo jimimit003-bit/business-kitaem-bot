@@ -8,8 +8,9 @@ bot = telebot.TeleBot(TOKEN)
 
 
 sections = {
+
     "intro": {
-        "title": "1️⃣ 🟢 Введение",
+        "title": "📚 Введение",
         "premium": False,
         "lessons": [
             "Что такое бизнес с Китаем",
@@ -19,7 +20,7 @@ sections = {
     },
 
     "platforms": {
-        "title": "2️⃣ 🟢 Обзор китайских площадок",
+        "title": "🔎 Обзор китайских площадок",
         "premium": False,
         "lessons": [
             "Taobao",
@@ -31,7 +32,7 @@ sections = {
     },
 
     "registration": {
-        "title": "3️⃣ 🟢 Регистрация и настройка аккаунтов",
+        "title": "👤 Регистрация и настройка аккаунтов",
         "premium": False,
         "lessons": [
             "Taobao",
@@ -45,7 +46,7 @@ sections = {
     },
 
     "delivery": {
-        "title": "4️⃣ 🟢 Настройка доставки",
+        "title": "🚚 Настройка доставки",
         "premium": False,
         "lessons": [
             "Как добавить адрес карго",
@@ -54,7 +55,7 @@ sections = {
     },
 
     "search": {
-        "title": "5️⃣ 🟢 Поиск товара",
+        "title": "📦 Поиск товара",
         "premium": False,
         "lessons": [
             "Поиск по фото",
@@ -64,7 +65,7 @@ sections = {
     },
 
     "suppliers": {
-        "title": "6️⃣ 🔒 Работа с фабриками и поставщиками",
+        "title": "🏭 Работа с фабриками и поставщиками",
         "premium": True,
         "lessons": [
             "Как проверить фабрику или поставщика",
@@ -75,7 +76,7 @@ sections = {
     },
 
     "orders": {
-        "title": "7️⃣ 🔒 Как оформить заказ",
+        "title": "📝 Как оформить заказ",
         "premium": True,
         "lessons": [
             "Оформление заказа",
@@ -86,7 +87,7 @@ sections = {
     },
 
     "returns": {
-        "title": "8️⃣ 🔒 Возврат и отмена заказа",
+        "title": "↩️ Возврат и отмена заказа",
         "premium": True,
         "lessons": [
             "Отмена заказа",
@@ -96,7 +97,7 @@ sections = {
     },
 
     "cargo": {
-        "title": "9️⃣ 🔒 Карго и логистика",
+        "title": "🚛 Карго и логистика",
         "premium": True,
         "lessons": [
             "Что такое карго",
@@ -107,7 +108,7 @@ sections = {
     },
 
     "tools": {
-        "title": "🔟 🔒 Полезные инструменты",
+        "title": "🛠️ Полезные инструменты",
         "premium": True,
         "lessons": [
             "Переводчики",
@@ -116,7 +117,7 @@ sections = {
     },
 
     "support": {
-        "title": "1️⃣1️⃣ 🔒 Поддержка",
+        "title": "🎧 Поддержка",
         "premium": True,
         "lessons": [
             "AI-помощник",
@@ -125,7 +126,7 @@ sections = {
     },
 
     "subscription": {
-        "title": "1️⃣2️⃣ 💎 Подписка",
+        "title": "💎 Подписка",
         "premium": False,
         "lessons": [
             "Бесплатный доступ",
@@ -134,7 +135,7 @@ sections = {
     },
 
     "rules": {
-        "title": "1️⃣3️⃣ 🟢 Правила и безопасность",
+        "title": "🛡️ Правила и безопасность",
         "premium": False,
         "lessons": [
             "Правила бота",
@@ -142,7 +143,8 @@ sections = {
             "Безопасность платежей"
         ]
     }
-}
+
+} 
 
 
 def create_main_menu():
