@@ -162,11 +162,17 @@ def create_main_menu():
 @bot.message_handler(commands=["start"])
 def start(message):
     bot.send_message(
-        message.chat.id,
-        "🇨🇳 Добро пожаловать в бот «Бизнес с Китаем»!\n\n"
-        "Выберите нужный раздел:",
-        reply_markup=create_main_menu()
-    )
+    message.chat.id,
+    "🇨🇳 Добро пожаловать в бот «Бизнес с Китаем»!\n\n"
+    "Выберите нужный раздел:",
+    reply_markup=types.ReplyKeyboardRemove()
+)
+
+bot.send_message(
+    message.chat.id,
+    "📚 Разделы обучения:",
+    reply_markup=create_main_menu()
+)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("section_"))
