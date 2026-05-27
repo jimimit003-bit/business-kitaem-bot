@@ -5,7 +5,6 @@ from telebot import types
 TOKEN = os.getenv("TOKEN")
 bot = telebot.TeleBot(TOKEN)
 
-last_message = {}
 
 sections = {
     "intro": {
@@ -34,32 +33,32 @@ sections = {
         "lessons": ["🔍 Поиск по фото", "🔑 Поиск по ключевым словам"]
     },
     "suppliers": {
-        "title": "🏭 Работа с фабриками и поставщиками",
+        "title": "🔒 🏭 Работа с фабриками и поставщиками",
         "premium": True,
         "lessons": ["🏭 Как проверить фабрику или поставщика", "💬 Как написать китайцу", "💰 Как торговаться", "📦 Что такое MOQ"]
     },
     "orders": {
-        "title": "📝 Как оформить заказ",
+        "title": "🔒 📝 Как оформить заказ",
         "premium": True,
         "lessons": ["🛒 Оформление заказа", "💳 Оплата", "📍 Отслеживание товара", "📦 Поступление товара на склад"]
     },
     "returns": {
-        "title": "↩️ Возврат и отмена заказа",
+        "title": "🔒 ↩️ Возврат и отмена заказа",
         "premium": True,
         "lessons": ["❌ Отмена заказа", "📦 Возврат товара", "⚖️ Открытие спора"]
     },
     "cargo": {
-        "title": "🚛 Карго и логистика",
+        "title": "🔒 🚛 Карго и логистика",
         "premium": True,
         "lessons": ["🚛 Что такое карго", "📄 Белая доставка", "📦 Карго доставка", "✅ Проверенные карго"]
     },
     "tools": {
-        "title": "🛠️ Полезные инструменты",
+        "title": "🔒 🛠️ Полезные инструменты",
         "premium": True,
         "lessons": ["🌐 Переводчики", "💬 Шаблоны сообщений китайцам"]
     },
     "support": {
-        "title": "🎧 Поддержка",
+        "title": "🔒 🎧 Поддержка",
         "premium": True,
         "lessons": ["🤖 AI-помощник", "👨‍💼 Помощь специалиста"]
     },
@@ -76,22 +75,27 @@ sections = {
 }
 
 
-def bottom_menu():
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("🏠 Меню", "👤 Профиль")
-    markup.add("💎 Подписка", "❓ Помощь")
-    return markup
-
-
-def main_menu_keyboard():
+def main_keyboard():
     keyboard = types.InlineKeyboardMarkup()
-    for key, section in sections.items():
-        keyboard.add(types.InlineKeyboardButton(section["title"], callback_data=f"section:{key}"))
+    keyboard.add(types.InlineKeyboardButton("📚 Обучение", callback_data="learning"))
+    keyboard.add(types.InlineKeyboardButton("👤 Профиль", callback_data="profile"))
+    keyboard.add(types.InlineKeyboardButton("💎 Подписка", callback_data="subscription"))
+    keyboard.add(types.InlineKeyboardButton("❓ Помощь", callback_data="help"))
     return keyboard
 
 
-def back_keyboard():
+def learning_keyboard():
     keyboard = types.InlineKeyboardMarkup()
+
+    for key, section in sections.items():
+        if key not in ["subscription"]:
+            keyboard.add(
+                types.InlineKeyboardButton(
+                    section["title"],
+                    callback_data=f"section:{key}"
+                )
+            )
+
     keyboard.add(types.InlineKeyboardButton("⬅️ Назад в меню", callback_data="main"))
     return keyboard
 
@@ -100,146 +104,182 @@ def section_keyboard(section_key):
     keyboard = types.InlineKeyboardMarkup()
     section = sections[section_key]
 
-    for i, lesson in enumerate(section["lessons"]):
-        keyboard.add(types.InlineKeyboardButton(lesson, callback_data=f"lesson:{section_key}:{i}"))
+    for index, lesson in enumerate(section["lessons"]):
+        keyboard.add(
+            types.InlineKeyboardButton(
+                lesson,
+                callback_data=f"lesson:{section_key}:{index}"
+            )
+        )
 
-    keyboard.add(types.InlineKeyboardButton("⬅️ Назад в меню", callback_data="main"))
+    keyboard.add(types.InlineKeyboardButton("⬅️ Назад к обучению", callback_data="learning"))
+    keyboard.add(types.InlineKeyboardButton("🏠 Главное меню", callback_data="main"))
     return keyboard
 
 
-def show_screen(chat_id, text, keyboard=None):
-    if chat_id in last_message:
-        try:
+def premium_keyboard():
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton("💎 Открыть Premium", callback_data="subscription"))
+    keyboard.add(types.InlineKeyboardButton("⬅️ Назад к обучению", callback_data="learning"))
+    return keyboard
+
+
+def lesson_keyboard(section_key):
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton("⬅️ Назад к разделу", callback_data=f"section:{section_key}"))
+    keyboard.add(types.InlineKeyboardButton("🏠 Главное меню", callback_data="main"))
+    return keyboard
+
+
+def send_or_edit(call_or_message, text, keyboard):
+    try:
+        if hasattr(call_or_message, "message"):
             bot.edit_message_text(
                 text,
-                chat_id,
-                last_message[chat_id],
+                call_or_message.message.chat.id,
+                call_or_message.message.message_id,
                 reply_markup=keyboard
             )
-            return
-        except Exception:
-            pass
-
-    msg = bot.send_message(chat_id, text, reply_markup=keyboard)
-    last_message[chat_id] = msg.message_id
+        else:
+            bot.send_message(
+                call_or_message.chat.id,
+                text,
+                reply_markup=keyboard
+            )
+    except Exception:
+        if hasattr(call_or_message, "message"):
+            bot.send_message(
+                call_or_message.message.chat.id,
+                text,
+                reply_markup=keyboard
+            )
 
 
 @bot.message_handler(commands=["start"])
 def start(message):
     bot.send_message(
         message.chat.id,
-        "🇨🇳 Добро пожаловать в бот «Бизнес с Китаем»!",
-        reply_markup=bottom_menu()
+        "🇨🇳 Добро пожаловать в бот «Бизнес с Китаем»!\n\n"
+        "Здесь вы сможете изучить закупки товаров из Китая.\n\n"
+        "Выберите нужный раздел:",
+        reply_markup=types.ReplyKeyboardRemove()
     )
 
-    show_screen(
+    bot.send_message(
         message.chat.id,
-        "🏠 Главное меню\n\nВыберите нужный раздел:",
-        main_menu_keyboard()
-    )
-
-
-@bot.message_handler(func=lambda message: message.text == "🏠 Меню")
-def menu_button(message):
-    show_screen(
-        message.chat.id,
-        "🏠 Главное меню\n\nВыберите нужный раздел:",
-        main_menu_keyboard()
-    )
-
-
-@bot.message_handler(func=lambda message: message.text == "👤 Профиль")
-def profile_button(message):
-    show_screen(
-        message.chat.id,
-        "👤 Ваш профиль\n\n💎 Статус: Free\n📚 Доступ: бесплатные разделы\n\nPremium-доступ скоро будет доступен.",
-        back_keyboard()
-    )
-
-
-@bot.message_handler(func=lambda message: message.text == "💎 Подписка")
-def subscription_button(message):
-    show_screen(
-        message.chat.id,
-        "💎 Premium-подписка\n\nPremium откроет закрытые разделы обучения:\n\n• работа с поставщиками\n• оформление заказа\n• карго и логистика\n• полезные инструменты\n• поддержка\n\nОплату подключим позже.",
-        back_keyboard()
-    )
-
-
-@bot.message_handler(func=lambda message: message.text == "❓ Помощь")
-def help_button(message):
-    show_screen(
-        message.chat.id,
-        "❓ Помощь\n\nЕсли возник вопрос — напишите администратору.\n\nПозже здесь будет кнопка связи со специалистом.",
-        back_keyboard()
+        "🏠 Главное меню\n\nВыберите действие:",
+        reply_markup=main_keyboard()
     )
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "main")
-def callback_main(call):
-    last_message[call.message.chat.id] = call.message.message_id
-
-    bot.edit_message_text(
-        "🏠 Главное меню\n\nВыберите нужный раздел:",
-        call.message.chat.id,
-        call.message.message_id,
-        reply_markup=main_menu_keyboard()
+def open_main(call):
+    bot.answer_callback_query(call.id)
+    send_or_edit(
+        call,
+        "🏠 Главное меню\n\nВыберите действие:",
+        main_keyboard()
     )
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "learning")
+def open_learning(call):
+    bot.answer_callback_query(call.id)
+    send_or_edit(
+        call,
+        "📚 Обучение\n\nВыберите раздел:",
+        learning_keyboard()
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "profile")
+def open_profile(call):
+    bot.answer_callback_query(call.id)
+    send_or_edit(
+        call,
+        "👤 Ваш профиль\n\n"
+        "💎 Статус: Free\n"
+        "📚 Доступ: бесплатные разделы\n\n"
+        "Premium-доступ скоро будет доступен.",
+        back_to_main_keyboard()
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "subscription")
+def open_subscription(call):
+    bot.answer_callback_query(call.id)
+    send_or_edit(
+        call,
+        "💎 Premium-подписка\n\n"
+        "Premium откроет закрытые разделы обучения:\n\n"
+        "• работа с фабриками и поставщиками\n"
+        "• оформление заказа\n"
+        "• возврат и отмена заказа\n"
+        "• карго и логистика\n"
+        "• полезные инструменты\n"
+        "• поддержка\n\n"
+        "Оплату подключим позже.",
+        back_to_main_keyboard()
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "help")
+def open_help(call):
+    bot.answer_callback_query(call.id)
+    send_or_edit(
+        call,
+        "❓ Помощь\n\n"
+        "Если возник вопрос — напишите администратору.\n\n"
+        "Позже здесь будет кнопка связи со специалистом.",
+        back_to_main_keyboard()
+    )
+
+
+def back_to_main_keyboard():
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton("🏠 Главное меню", callback_data="main"))
+    return keyboard
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("section:"))
 def open_section(call):
+    bot.answer_callback_query(call.id)
+
     section_key = call.data.split(":")[1]
     section = sections[section_key]
 
-    last_message[call.message.chat.id] = call.message.message_id
-
     if section["premium"]:
-        text = (
+        send_or_edit(
+            call,
             f"{section['title']}\n\n"
-            "🔒 Этот раздел доступен только по Premium-подписке.\n\n"
-            "Чтобы открыть доступ, перейдите в раздел 💎 Подписка."
-        )
-
-        bot.edit_message_text(
-            text,
-            call.message.chat.id,
-            call.message.message_id,
-            reply_markup=back_keyboard()
+            "Этот раздел доступен только по Premium-подписке.\n\n"
+            "В Premium входят закрытые уроки, практические инструкции и полезные материалы.",
+            premium_keyboard()
         )
         return
 
-    bot.edit_message_text(
+    send_or_edit(
+        call,
         f"{section['title']}\n\nВыберите урок:",
-        call.message.chat.id,
-        call.message.message_id,
-        reply_markup=section_keyboard(section_key)
+        section_keyboard(section_key)
     )
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("lesson:"))
 def open_lesson(call):
+    bot.answer_callback_query(call.id)
+
     _, section_key, lesson_index = call.data.split(":")
     lesson_index = int(lesson_index)
 
-    section = sections[section_key]
-    lesson = section["lessons"][lesson_index]
+    lesson = sections[section_key]["lessons"][lesson_index]
 
-    text = (
+    send_or_edit(
+        call,
         f"{lesson}\n\n"
         "Здесь будет текст урока.\n\n"
-        "Позже сюда можно добавить видео, фото, ссылки и подробную инструкцию."
-    )
-
-    keyboard = types.InlineKeyboardMarkup()
-    keyboard.add(types.InlineKeyboardButton("⬅️ Назад к разделу", callback_data=f"section:{section_key}"))
-    keyboard.add(types.InlineKeyboardButton("🏠 Главное меню", callback_data="main"))
-
-    bot.edit_message_text(
-        text,
-        call.message.chat.id,
-        call.message.message_id,
-        reply_markup=keyboard
+        "Позже сюда можно добавить видео, фото, ссылки и подробную инструкцию.",
+        lesson_keyboard(section_key)
     )
 
 
