@@ -78,10 +78,15 @@ sections = {
 def main_keyboard():
     keyboard = types.InlineKeyboardMarkup()
 
-    keyboard.add(types.InlineKeyboardButton("📚 Обучение", callback_data="learning"))
-    keyboard.add(types.InlineKeyboardButton("👤 Профиль", callback_data="profile"))
-    keyboard.add(types.InlineKeyboardButton("💎 Подписка", callback_data="subscription"))
-    keyboard.add(types.InlineKeyboardButton("❓ Помощь", callback_data="help"))
+    keyboard.row(
+        types.InlineKeyboardButton("📚 Обучение", callback_data="learning"),
+        types.InlineKeyboardButton("👤 Профиль", callback_data="profile")
+    )
+
+    keyboard.row(
+        types.InlineKeyboardButton("💎 Подписка", callback_data="subscription"),
+        types.InlineKeyboardButton("❓ Помощь", callback_data="help")
+    )
 
     return keyboard
 
