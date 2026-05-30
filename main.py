@@ -360,11 +360,18 @@ def open_lesson(call):
 
     lesson = sections[section_key]["lessons"][lesson_index]
 
-    send_or_edit(
-        call,
+    lesson_id = f"{section_key}_{lesson_index}"
+
+    text = lesson_texts.get(
+        lesson_id,
         f"{lesson}\n\n"
         "Здесь будет текст урока.\n\n"
-        "Позже сюда можно добавить видео, фото, ссылки и подробную инструкцию.",
+        "Позже сюда можно добавить видео, фото, ссылки и подробную инструкцию."
+    )
+
+    send_or_edit(
+        call,
+        text,
         lesson_keyboard(section_key)
     )
 
